@@ -9,6 +9,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import TemplateBuilder from "./pages/TemplateBuilder";
 import TemplatesList from "./pages/TemplatesList";
 import SubmissionsReview from "./pages/SubmissionsReview";
+import Analytics from "./pages/Analytics";
 import Interview from "./pages/Interview";
 import ProtectedRoute from "./components/ProtectedRoute";
 import NotFound from "./pages/NotFound";
