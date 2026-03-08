@@ -29,6 +29,7 @@ const App = () => (
           <Route path="/admin/templates" element={<ProtectedRoute><TemplatesList /></ProtectedRoute>} />
           <Route path="/admin/templates/:id" element={<ProtectedRoute><TemplateBuilder /></ProtectedRoute>} />
           <Route path="/admin/submissions" element={<ProtectedRoute><SubmissionsReview /></ProtectedRoute>} />
+          <Route path="/admin/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
           <Route path="/interview/:templateId" element={<Interview />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
