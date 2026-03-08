@@ -1,12 +1,17 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion, Reorder } from "framer-motion";
-import { Plus, Trash2, GripVertical, Save, ArrowLeft, Clock, Video } from "lucide-react";
+import { Plus, Trash2, GripVertical, Save, ArrowLeft, Clock, Video, CalendarIcon, Eye } from "lucide-react";
+import { format } from "date-fns";
 import AdminLayout from "@/components/AdminLayout";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -16,7 +21,10 @@ interface Question {
   order_index: number;
   prep_time_seconds: number;
   recording_duration_seconds: number;
-  _isNew?: boolean; // client-only flag
+  description: string;
+  is_required: boolean;
+  video_prompt_url: string | null;
+  _isNew?: boolean;
 }
 
 export default function TemplateBuilder() {
@@ -26,9 +34,12 @@ export default function TemplateBuilder() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [department, setDepartment] = useState("");
   const [isActive, setIsActive] = useState(true);
   const [retakesAllowed, setRetakesAllowed] = useState(1);
   const [redirectUrl, setRedirectUrl] = useState("");
+  const [deadline, setDeadline] = useState<Date | undefined>();
+  const [introVideoUrl, setIntroVideoUrl] = useState<string | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(!isNew);
@@ -48,9 +59,12 @@ export default function TemplateBuilder() {
     if (template) {
       setTitle(template.title);
       setDescription(template.description || "");
+      setDepartment(template.department || "");
       setIsActive(template.is_active);
       setRetakesAllowed(template.retakes_allowed ?? 1);
       setRedirectUrl(template.redirect_url || "");
+      setDeadline(template.deadline ? new Date(template.deadline) : undefined);
+      setIntroVideoUrl(template.intro_video_url || null);
     }
 
     const { data: qs } = await supabase
@@ -61,7 +75,14 @@ export default function TemplateBuilder() {
       .order("order_index");
 
     if (qs) {
-      setQuestions(qs);
+      setQuestions(
+        qs.map((q) => ({
+          ...q,
+          description: q.description || "",
+          is_required: q.is_required ?? true,
+          video_prompt_url: q.video_prompt_url || null,
+        }))
+      );
       setDbQuestionIds(new Set(qs.map((q) => q.id)));
     }
     setLoading(false);
@@ -76,17 +97,40 @@ export default function TemplateBuilder() {
         order_index: questions.length,
         prep_time_seconds: 30,
         recording_duration_seconds: 120,
+        description: "",
+        is_required: true,
+        video_prompt_url: null,
         _isNew: true,
       },
     ]);
   };
 
-  const updateQuestion = (qId: string, field: keyof Question, value: string | number) => {
+  const updateQuestion = (qId: string, field: keyof Question, value: string | number | boolean) => {
     setQuestions(questions.map((q) => (q.id === qId ? { ...q, [field]: value } : q)));
   };
 
   const removeQuestion = (qId: string) => {
     setQuestions(questions.filter((q) => q.id !== qId));
+  };
+
+  const handleIntroVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 100 * 1024 * 1024) {
+      toast.error("File must be under 100 MB");
+      return;
+    }
+    const templateId = isNew ? "draft" : id;
+    const ext = file.name.split(".").pop() || "webm";
+    const path = `intros/${templateId}.${ext}`;
+    const { data, error } = await supabase.storage.from("interview-videos").upload(path, file, { upsert: true });
+    if (error) {
+      toast.error("Failed to upload intro video");
+      return;
+    }
+    const { data: urlData } = supabase.storage.from("interview-videos").getPublicUrl(path);
+    setIntroVideoUrl(urlData.publicUrl);
+    toast.success("Intro video uploaded!");
   };
 
   const handleSave = async () => {
@@ -100,11 +144,21 @@ export default function TemplateBuilder() {
       if (!user) throw new Error("Not authenticated");
 
       let templateId = id;
+      const templateData = {
+        title,
+        description,
+        department: department || null,
+        is_active: isActive,
+        retakes_allowed: retakesAllowed,
+        redirect_url: redirectUrl || null,
+        deadline: deadline ? deadline.toISOString() : null,
+        intro_video_url: introVideoUrl,
+      };
 
       if (isNew) {
         const { data, error } = await supabase
           .from("interview_templates")
-          .insert({ title, description, is_active: isActive, admin_id: user.id, retakes_allowed: retakesAllowed, redirect_url: redirectUrl || null })
+          .insert({ ...templateData, admin_id: user.id })
           .select("id")
           .single();
         if (error) throw error;
@@ -112,7 +166,7 @@ export default function TemplateBuilder() {
       } else {
         const { error } = await supabase
           .from("interview_templates")
-          .update({ title, description, is_active: isActive, retakes_allowed: retakesAllowed, redirect_url: redirectUrl || null })
+          .update(templateData)
           .eq("id", id!);
         if (error) throw error;
       }
@@ -121,27 +175,19 @@ export default function TemplateBuilder() {
       const currentQuestionIds = new Set(questions.map((q) => q.id));
       const removedIds = [...dbQuestionIds].filter((dbId) => !currentQuestionIds.has(dbId));
 
-      // Handle removed questions
       for (const removedId of removedIds) {
-        // Check if this question has linked answers
         const { count } = await supabase
           .from("submission_answers")
           .select("id", { count: "exact", head: true })
           .eq("question_id", removedId);
 
         if (count && count > 0) {
-          // Soft-delete: has linked answers
-          await supabase
-            .from("questions")
-            .update({ is_deleted: true })
-            .eq("id", removedId);
+          await supabase.from("questions").update({ is_deleted: true }).eq("id", removedId);
         } else {
-          // Hard delete: no linked answers
           await supabase.from("questions").delete().eq("id", removedId);
         }
       }
 
-      // Update existing and insert new questions
       for (let i = 0; i < questions.length; i++) {
         const q = questions[i];
         const row = {
@@ -150,18 +196,16 @@ export default function TemplateBuilder() {
           order_index: i,
           prep_time_seconds: q.prep_time_seconds,
           recording_duration_seconds: q.recording_duration_seconds,
+          description: q.description || null,
+          is_required: q.is_required,
+          video_prompt_url: q.video_prompt_url,
         };
 
         if (q._isNew || !dbQuestionIds.has(q.id)) {
-          // Insert new question
           const { error } = await supabase.from("questions").insert(row);
           if (error) throw error;
         } else {
-          // Update existing question
-          const { error } = await supabase
-            .from("questions")
-            .update(row)
-            .eq("id", q.id);
+          const { error } = await supabase.from("questions").update(row).eq("id", q.id);
           if (error) throw error;
         }
       }
@@ -186,16 +230,28 @@ export default function TemplateBuilder() {
   return (
     <AdminLayout>
       <div className="max-w-3xl mx-auto space-y-8">
-        <div className="flex items-center gap-4">
-          <button onClick={() => navigate("/admin/templates")} className="p-2 rounded-lg hover:bg-secondary transition-colors">
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div>
-            <h1 className="font-display text-2xl font-bold">
-              {isNew ? "New Template" : "Edit Template"}
-            </h1>
-            <p className="text-sm text-muted-foreground">Configure your interview questions</p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button onClick={() => navigate("/admin/templates")} className="p-2 rounded-lg hover:bg-secondary transition-colors">
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div>
+              <h1 className="font-display text-2xl font-bold">
+                {isNew ? "New Template" : "Edit Template"}
+              </h1>
+              <p className="text-sm text-muted-foreground">Configure your interview questions</p>
+            </div>
           </div>
+          {!isNew && id && (
+            <a
+              href={`/interview/${id}?preview=true`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 rounded-md bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
+            >
+              <Eye className="h-3 w-3" /> Preview
+            </a>
+          )}
         </div>
 
         {/* Template Info */}
@@ -206,6 +262,15 @@ export default function TemplateBuilder() {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g. Frontend Developer Interview"
+              className="bg-secondary/50 border-border/50"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Department</Label>
+            <Input
+              value={department}
+              onChange={(e) => setDepartment(e.target.value)}
+              placeholder="e.g. Engineering, Marketing, Sales"
               className="bg-secondary/50 border-border/50"
             />
           </div>
@@ -241,15 +306,70 @@ export default function TemplateBuilder() {
               </select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="redirect-url">Redirect URL (optional)</Label>
-              <Input
-                id="redirect-url"
-                value={redirectUrl}
-                onChange={(e) => setRedirectUrl(e.target.value)}
-                placeholder="https://yoursite.com/thanks"
-                className="bg-secondary/50 border-border/50"
-              />
+              <Label>Deadline (optional)</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal bg-secondary/50 border-border/50",
+                      !deadline && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {deadline ? format(deadline, "PPP") : "No deadline"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={deadline}
+                    onSelect={setDeadline}
+                    initialFocus
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                  {deadline && (
+                    <div className="p-2 border-t border-border">
+                      <Button variant="ghost" size="sm" className="w-full" onClick={() => setDeadline(undefined)}>
+                        Clear deadline
+                      </Button>
+                    </div>
+                  )}
+                </PopoverContent>
+              </Popover>
             </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="redirect-url">Redirect URL (optional)</Label>
+            <Input
+              id="redirect-url"
+              value={redirectUrl}
+              onChange={(e) => setRedirectUrl(e.target.value)}
+              placeholder="https://yoursite.com/thanks"
+              className="bg-secondary/50 border-border/50"
+            />
+          </div>
+
+          {/* Intro Video */}
+          <div className="space-y-2">
+            <Label>Intro Video (optional)</Label>
+            {introVideoUrl ? (
+              <div className="space-y-2">
+                <video src={introVideoUrl} controls className="w-full max-w-sm rounded-lg border border-border" />
+                <Button variant="ghost" size="sm" onClick={() => setIntroVideoUrl(null)}>
+                  Remove intro video
+                </Button>
+              </div>
+            ) : (
+              <div>
+                <label className="flex items-center gap-2 rounded-md bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors cursor-pointer w-fit">
+                  <Video className="h-4 w-4" /> Upload intro video
+                  <input type="file" accept="video/*" className="hidden" onChange={handleIntroVideoUpload} />
+                </label>
+                <p className="text-xs text-muted-foreground mt-1">Shown to candidates before they start. Max 100 MB.</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -281,9 +401,14 @@ export default function TemplateBuilder() {
                     </div>
                     <div className="flex-1 space-y-4">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          Question {i + 1}
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-medium text-muted-foreground">
+                            Question {i + 1}
+                          </span>
+                          {!q.is_required && (
+                            <span className="text-xs rounded-full bg-muted px-2 py-0.5 text-muted-foreground">Optional</span>
+                          )}
+                        </div>
                         <button
                           onClick={() => removeQuestion(q.id)}
                           className="p-1 rounded hover:bg-destructive/10 hover:text-destructive transition-colors"
@@ -296,6 +421,13 @@ export default function TemplateBuilder() {
                         onChange={(e) => updateQuestion(q.id, "question_text", e.target.value)}
                         placeholder="Enter your question..."
                         className="bg-secondary/50 border-border/50 resize-none"
+                        rows={2}
+                      />
+                      <Textarea
+                        value={q.description}
+                        onChange={(e) => updateQuestion(q.id, "description", e.target.value)}
+                        placeholder="Description / hints for the candidate (optional)"
+                        className="bg-secondary/50 border-border/50 resize-none text-sm"
                         rows={2}
                       />
                       <div className="grid grid-cols-2 gap-4">
@@ -323,6 +455,14 @@ export default function TemplateBuilder() {
                             className="bg-secondary/50 border-border/50"
                           />
                         </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Switch
+                          checked={q.is_required}
+                          onCheckedChange={(val) => updateQuestion(q.id, "is_required", val)}
+                          id={`required-${q.id}`}
+                        />
+                        <Label htmlFor={`required-${q.id}`} className="text-xs">Required</Label>
                       </div>
                     </div>
                   </div>

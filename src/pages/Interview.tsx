@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -19,11 +19,14 @@ interface Question {
   order_index: number;
   prep_time_seconds: number;
   recording_duration_seconds: number;
+  description: string | null;
+  is_required: boolean;
+  video_prompt_url: string | null;
 }
 
 type Stage = "welcome" | "info" | "setup" | "prep" | "recording" | "review" | "complete";
 
-// IndexedDB helper for offline blob storage
+// IndexedDB helpers
 const IDB_NAME = "interview-blobs";
 const IDB_STORE = "pending";
 
@@ -60,13 +63,18 @@ async function uploadWithRetry(bucket: string, path: string, blob: Blob, retries
 
 export default function Interview() {
   const { templateId } = useParams();
+  const [searchParams] = useSearchParams();
+  const isPreview = searchParams.get("preview") === "true";
+
   const [templateTitle, setTemplateTitle] = useState("");
   const [templateDesc, setTemplateDesc] = useState("");
+  const [introVideoUrl, setIntroVideoUrl] = useState<string | null>(null);
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
   const [retakesAllowed, setRetakesAllowed] = useState(1);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [expired, setExpired] = useState(false);
   const [unsupportedBrowser, setUnsupportedBrowser] = useState(false);
 
   const [stage, setStage] = useState<Stage>("welcome");
@@ -101,7 +109,6 @@ export default function Interview() {
     return () => videoTrack.removeEventListener("ended", handleEnded);
   }, [stage, streamRef.current]);
 
-  // beforeunload warning
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       if (stage === "prep" || stage === "recording" || stage === "review") {
@@ -146,12 +153,17 @@ export default function Interview() {
   }, [templateId]);
 
   const loadTemplate = async () => {
-    const { data: template } = await supabase
+    // In preview mode, load template even if inactive
+    let query = supabase
       .from("interview_templates")
       .select("*")
-      .eq("id", templateId!)
-      .eq("is_active", true)
-      .maybeSingle();
+      .eq("id", templateId!);
+
+    if (!isPreview) {
+      query = query.eq("is_active", true);
+    }
+
+    const { data: template } = await query.maybeSingle();
 
     if (!template) {
       setNotFound(true);
@@ -159,8 +171,16 @@ export default function Interview() {
       return;
     }
 
+    // Check deadline
+    if (template.deadline && new Date(template.deadline) < new Date() && !isPreview) {
+      setExpired(true);
+      setLoading(false);
+      return;
+    }
+
     setTemplateTitle(template.title);
     setTemplateDesc(template.description || "");
+    setIntroVideoUrl(template.intro_video_url || null);
     setRedirectUrl(template.redirect_url || null);
     setRetakesAllowed(template.retakes_allowed ?? 1);
 
@@ -171,7 +191,14 @@ export default function Interview() {
       .eq("is_deleted", false)
       .order("order_index");
 
-    setQuestions(qs || []);
+    setQuestions(
+      (qs || []).map((q) => ({
+        ...q,
+        description: q.description || null,
+        is_required: q.is_required ?? true,
+        video_prompt_url: q.video_prompt_url || null,
+      }))
+    );
     setLoading(false);
   };
 
@@ -192,8 +219,14 @@ export default function Interview() {
 
   const handleInfoSubmit = async () => {
     if (!name.trim() || !email.trim()) return;
-    setSubmitting(true);
 
+    if (isPreview) {
+      setSubmissionId("preview");
+      setStage("setup");
+      return;
+    }
+
+    setSubmitting(true);
     const { data, error } = await supabase
       .from("submissions")
       .insert({ template_id: templateId!, applicant_name: name, applicant_email: email })
@@ -227,7 +260,6 @@ export default function Interview() {
     setElapsed(0);
     clearTimer();
 
-    // Ensure video is playing
     if (videoRef.current && streamRef.current) {
       videoRef.current.srcObject = streamRef.current;
       videoRef.current.play();
@@ -277,9 +309,22 @@ export default function Interview() {
     recorder.stop();
   };
 
+  const handleSkipQuestion = () => {
+    // Skip non-required question - move to next
+    clearTimer();
+    if (recorder.isRecording()) recorder.stop();
+    pendingBlobRef.current = null;
+    moveToNext();
+  };
+
   const uploadAndSave = async (qIndex: number) => {
     const pending = pendingBlobRef.current;
     if (!pending || !submissionId) return;
+
+    if (isPreview) {
+      pendingBlobRef.current = null;
+      return;
+    }
 
     setUploading(true);
     const q = questions[qIndex];
@@ -294,10 +339,9 @@ export default function Interview() {
       videoUrl = urlData.publicUrl;
       removeBlobFromIDB(idbKey).catch(() => {});
     } else {
-      // Save to IndexedDB for retry
       try {
         await saveBlobToIDB(idbKey, pending.blob);
-        toast.error("Upload failed. Your recording is saved locally. Please check your connection and try again.", { duration: 10000 });
+        toast.error("Upload failed. Your recording is saved locally.", { duration: 10000 });
       } catch {
         toast.error("Upload failed and could not save locally.");
       }
@@ -314,9 +358,7 @@ export default function Interview() {
     return success;
   };
 
-  const handleNext = async () => {
-    await uploadAndSave(currentQ);
-
+  const moveToNext = () => {
     if (currentQ + 1 < questions.length) {
       const next = currentQ + 1;
       setCurrentQ(next);
@@ -327,6 +369,13 @@ export default function Interview() {
     }
   };
 
+  const handleNext = async () => {
+    if (pendingBlobRef.current) {
+      await uploadAndSave(currentQ);
+    }
+    moveToNext();
+  };
+
   const handleRetake = () => {
     pendingBlobRef.current = null;
     setRetakesUsed((prev) => ({ ...prev, [currentQ]: (prev[currentQ] || 0) + 1 }));
@@ -335,7 +384,7 @@ export default function Interview() {
 
   const getRetakesRemaining = () => {
     if (retakesAllowed === 0) return 0;
-    if (retakesAllowed < 0) return Infinity; // unlimited
+    if (retakesAllowed < 0) return Infinity;
     const used = retakesUsed[currentQ] || 0;
     return Math.max(0, retakesAllowed - used);
   };
@@ -354,15 +403,25 @@ export default function Interview() {
         <div className="glass-card p-12 text-center max-w-md space-y-4">
           <AlertTriangle className="mx-auto h-12 w-12 text-warning" />
           <h1 className="font-display text-2xl font-bold">Browser Not Supported</h1>
-          <p className="text-muted-foreground">
-            Your browser does not support video recording. Please use one of the following:
-          </p>
+          <p className="text-muted-foreground">Your browser does not support video recording.</p>
           <ul className="text-sm text-muted-foreground space-y-1">
             <li>• Google Chrome (recommended)</li>
             <li>• Mozilla Firefox</li>
             <li>• Microsoft Edge</li>
             <li>• Safari 14.1+</li>
           </ul>
+        </div>
+      </div>
+    );
+  }
+
+  if (expired) {
+    return (
+      <div className="flex min-h-screen items-center justify-center mesh-gradient">
+        <div className="glass-card p-12 text-center max-w-md space-y-4">
+          <AlertTriangle className="mx-auto h-12 w-12 text-destructive" />
+          <h1 className="font-display text-2xl font-bold">Interview Closed</h1>
+          <p className="text-muted-foreground">This interview has passed its deadline and is no longer accepting submissions.</p>
         </div>
       </div>
     );
@@ -380,13 +439,19 @@ export default function Interview() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center mesh-gradient overflow-hidden">
+    <div className="flex min-h-screen items-center justify-center mesh-gradient overflow-hidden relative">
+      {isPreview && (
+        <div className="absolute top-0 left-0 right-0 bg-primary text-primary-foreground text-center py-2 text-sm font-medium z-50">
+          PREVIEW MODE — No data will be saved
+        </div>
+      )}
       <AnimatePresence mode="wait">
         {stage === "welcome" && (
           <WelcomeScreen
             title={templateTitle}
             description={templateDesc}
             questionCount={questions.length}
+            introVideoUrl={introVideoUrl}
             onBegin={handleBegin}
           />
         )}
@@ -417,6 +482,7 @@ export default function Interview() {
             videoRef={videoRef as React.RefObject<HTMLVideoElement>}
             onSkipPrep={handleSkipPrep}
             onFinishEarly={handleFinishEarly}
+            onSkipQuestion={!questions[currentQ].is_required ? handleSkipQuestion : undefined}
           />
         )}
 
@@ -436,7 +502,7 @@ export default function Interview() {
             name={name}
             templateTitle={templateTitle}
             questionCount={questions.length}
-            redirectUrl={redirectUrl}
+            redirectUrl={isPreview ? null : redirectUrl}
           />
         )}
       </AnimatePresence>

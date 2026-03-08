@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Video } from "lucide-react";
+import { Video, SkipForward } from "lucide-react";
 import ProgressRing from "./ProgressRing";
 
 interface Question {
@@ -7,6 +7,9 @@ interface Question {
   question_text: string;
   prep_time_seconds: number;
   recording_duration_seconds: number;
+  description?: string | null;
+  is_required?: boolean;
+  video_prompt_url?: string | null;
 }
 
 interface QuestionScreenProps {
@@ -19,6 +22,7 @@ interface QuestionScreenProps {
   videoRef: React.RefObject<HTMLVideoElement>;
   onSkipPrep: () => void;
   onFinishEarly: () => void;
+  onSkipQuestion?: () => void;
 }
 
 const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
@@ -33,12 +37,12 @@ export default function QuestionScreen({
   videoRef,
   onSkipPrep,
   onFinishEarly,
+  onSkipQuestion,
 }: QuestionScreenProps) {
   const totalTime = stage === "prep" ? question.prep_time_seconds : question.recording_duration_seconds;
   const timeRatio = totalTime > 0 ? (totalTime - timer) / totalTime : 0;
   const progressPercent = ((questionIndex + (stage === "recording" ? 0.5 : 0)) / totalQuestions) * 100;
 
-  // Timer color logic for recording
   let ringVariant: "primary" | "destructive" | "warning" = stage === "recording" ? "destructive" : "primary";
   if (stage === "recording" && totalTime > 0) {
     if (timeRatio >= 0.95) ringVariant = "destructive";
@@ -57,7 +61,10 @@ export default function QuestionScreen({
       {/* Progress bar */}
       <div className="mb-6 space-y-2">
         <div className="flex justify-between items-center text-sm text-muted-foreground">
-          <span>Question {questionIndex + 1} of {totalQuestions}</span>
+          <span>
+            Question {questionIndex + 1} of {totalQuestions}
+            {question.is_required === false && <span className="ml-2 text-xs opacity-70">(Optional)</span>}
+          </span>
           <span>{stage === "prep" ? "Preparation" : "Recording"}</span>
         </div>
         <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
@@ -96,8 +103,22 @@ export default function QuestionScreen({
             {question.question_text}
           </motion.h2>
 
-          {stage === "prep" && (
+          {question.description && (
+            <p className="text-sm text-muted-foreground">{question.description}</p>
+          )}
+
+          {stage === "prep" && !question.description && (
             <p className="text-sm text-muted-foreground italic">Take a moment to gather your thoughts.</p>
+          )}
+
+          {/* Video prompt during prep */}
+          {stage === "prep" && question.video_prompt_url && (
+            <video
+              src={question.video_prompt_url}
+              controls
+              className="w-full max-w-xs mx-auto rounded-lg border border-border"
+              preload="metadata"
+            />
           )}
 
           <div className="relative inline-flex items-center justify-center">
@@ -127,6 +148,15 @@ export default function QuestionScreen({
             {stage === "recording" && (
               <button onClick={onFinishEarly} className="glow-button text-sm" aria-label="Finish recording early">
                 Finish Early
+              </button>
+            )}
+            {onSkipQuestion && stage === "prep" && (
+              <button
+                onClick={onSkipQuestion}
+                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Skip this optional question"
+              >
+                <SkipForward className="h-4 w-4" /> Skip this question
               </button>
             )}
           </div>
