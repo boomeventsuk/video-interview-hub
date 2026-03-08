@@ -18,9 +18,13 @@ export type Database = {
         Row: {
           admin_id: string
           created_at: string
+          deadline: string | null
+          department: string | null
           description: string | null
           id: string
+          intro_video_url: string | null
           is_active: boolean
+          is_deleted: boolean
           redirect_url: string | null
           retakes_allowed: number
           title: string
@@ -29,9 +33,13 @@ export type Database = {
         Insert: {
           admin_id: string
           created_at?: string
+          deadline?: string | null
+          department?: string | null
           description?: string | null
           id?: string
+          intro_video_url?: string | null
           is_active?: boolean
+          is_deleted?: boolean
           redirect_url?: string | null
           retakes_allowed?: number
           title: string
@@ -40,9 +48,13 @@ export type Database = {
         Update: {
           admin_id?: string
           created_at?: string
+          deadline?: string | null
+          department?: string | null
           description?: string | null
           id?: string
+          intro_video_url?: string | null
           is_active?: boolean
+          is_deleted?: boolean
           redirect_url?: string | null
           retakes_allowed?: number
           title?: string
@@ -77,33 +89,42 @@ export type Database = {
       questions: {
         Row: {
           created_at: string
+          description: string | null
           id: string
           is_deleted: boolean
+          is_required: boolean
           order_index: number
           prep_time_seconds: number
           question_text: string
           recording_duration_seconds: number
           template_id: string
+          video_prompt_url: string | null
         }
         Insert: {
           created_at?: string
+          description?: string | null
           id?: string
           is_deleted?: boolean
+          is_required?: boolean
           order_index?: number
           prep_time_seconds?: number
           question_text: string
           recording_duration_seconds?: number
           template_id: string
+          video_prompt_url?: string | null
         }
         Update: {
           created_at?: string
+          description?: string | null
           id?: string
           is_deleted?: boolean
+          is_required?: boolean
           order_index?: number
           prep_time_seconds?: number
           question_text?: string
           recording_duration_seconds?: number
           template_id?: string
+          video_prompt_url?: string | null
         }
         Relationships: [
           {
