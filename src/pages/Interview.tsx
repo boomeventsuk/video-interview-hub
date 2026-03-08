@@ -1,10 +1,11 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, Video, CheckCircle, Loader2, Zap } from "lucide-react";
+import { Mic, Video, CheckCircle, Loader2, Zap, AlertTriangle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface Question {
   id: string;
@@ -16,6 +17,22 @@ interface Question {
 
 type Stage = "welcome" | "info" | "prep" | "recording" | "complete";
 
+const MAX_BLOB_SIZE = 100 * 1024 * 1024; // 100 MB
+
+function getSupportedMimeType(): { mimeType: string; ext: string } | null {
+  const candidates = [
+    { mimeType: "video/webm;codecs=vp9", ext: "webm" },
+    { mimeType: "video/webm", ext: "webm" },
+    { mimeType: "video/mp4", ext: "mp4" },
+  ];
+  for (const c of candidates) {
+    if (typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(c.mimeType)) {
+      return c;
+    }
+  }
+  return null;
+}
+
 export default function Interview() {
   const { templateId } = useParams();
   const [templateTitle, setTemplateTitle] = useState("");
@@ -23,6 +40,7 @@ export default function Interview() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  const [unsupportedBrowser, setUnsupportedBrowser] = useState(false);
 
   const [stage, setStage] = useState<Stage>("welcome");
   const [name, setName] = useState("");
@@ -36,8 +54,16 @@ export default function Interview() {
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<number | null>(null);
+  const mimeInfoRef = useRef<{ mimeType: string; ext: string } | null>(null);
 
   useEffect(() => {
+    const mime = getSupportedMimeType();
+    if (!mime) {
+      setUnsupportedBrowser(true);
+      setLoading(false);
+      return;
+    }
+    mimeInfoRef.current = mime;
     loadTemplate();
     return () => {
       stopStream();
@@ -66,6 +92,7 @@ export default function Interview() {
       .from("questions")
       .select("*")
       .eq("template_id", templateId!)
+      .eq("is_deleted", false)
       .order("order_index");
 
     setQuestions(qs || []);
@@ -95,7 +122,6 @@ export default function Interview() {
   const handleStartInterview = async () => {
     if (!name.trim() || !email.trim()) return;
 
-    // Create submission
     const { data, error } = await supabase
       .from("submissions")
       .insert({ template_id: templateId!, applicant_name: name, applicant_email: email })
@@ -137,8 +163,9 @@ export default function Interview() {
     setTimer(q.recording_duration_seconds);
     chunksRef.current = [];
 
-    if (streamRef.current) {
-      const mr = new MediaRecorder(streamRef.current, { mimeType: "video/webm" });
+    const mime = mimeInfoRef.current;
+    if (streamRef.current && mime) {
+      const mr = new MediaRecorder(streamRef.current, { mimeType: mime.mimeType });
       mr.ondataavailable = (e) => {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
@@ -168,11 +195,19 @@ export default function Interview() {
   };
 
   const finishRecording = async (qIndex: number) => {
-    const blob = new Blob(chunksRef.current, { type: "video/webm" });
-    const q = questions[qIndex];
-    const fileName = `${submissionId}/${q.id}.webm`;
+    const mime = mimeInfoRef.current!;
+    const blob = new Blob(chunksRef.current, { type: mime.mimeType });
 
-    // Upload to storage
+    // File size check
+    if (blob.size > MAX_BLOB_SIZE) {
+      toast.error("Recording exceeds 100 MB. Please re-record with a shorter answer.");
+      startPrep(qIndex); // allow re-record
+      return;
+    }
+
+    const q = questions[qIndex];
+    const fileName = `${submissionId}/${q.id}.${mime.ext}`;
+
     const { data: uploadData } = await supabase.storage
       .from("interview-videos")
       .upload(fileName, blob);
@@ -185,14 +220,12 @@ export default function Interview() {
       videoUrl = urlData.publicUrl;
     }
 
-    // Save answer
     await supabase.from("submission_answers").insert({
       submission_id: submissionId!,
       question_id: q.id,
       video_url: videoUrl,
     });
 
-    // Next question or complete
     if (qIndex + 1 < questions.length) {
       setCurrentQ(qIndex + 1);
       startPrep(qIndex + 1);
@@ -207,7 +240,6 @@ export default function Interview() {
   const formatTime = (s: number) =>
     `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, "0")}`;
 
-  // Progress ring SVG
   const ProgressRing = ({ current, total, size = 120 }: { current: number; total: number; size?: number }) => {
     const r = (size - 8) / 2;
     const c = 2 * Math.PI * r;
@@ -239,6 +271,26 @@ export default function Interview() {
     );
   }
 
+  if (unsupportedBrowser) {
+    return (
+      <div className="flex min-h-screen items-center justify-center mesh-gradient">
+        <div className="glass-card p-12 text-center max-w-md space-y-4">
+          <AlertTriangle className="mx-auto h-12 w-12 text-warning" />
+          <h1 className="font-display text-2xl font-bold">Browser Not Supported</h1>
+          <p className="text-muted-foreground">
+            Your browser does not support video recording. Please use one of the following:
+          </p>
+          <ul className="text-sm text-muted-foreground space-y-1">
+            <li>• Google Chrome (recommended)</li>
+            <li>• Mozilla Firefox</li>
+            <li>• Microsoft Edge</li>
+            <li>• Safari 14.1+</li>
+          </ul>
+        </div>
+      </div>
+    );
+  }
+
   if (notFound) {
     return (
       <div className="flex min-h-screen items-center justify-center mesh-gradient">
@@ -253,7 +305,6 @@ export default function Interview() {
   return (
     <div className="flex min-h-screen items-center justify-center mesh-gradient overflow-hidden">
       <AnimatePresence mode="wait">
-        {/* Welcome */}
         {stage === "welcome" && (
           <motion.div
             key="welcome"
@@ -278,7 +329,6 @@ export default function Interview() {
           </motion.div>
         )}
 
-        {/* Info capture */}
         {stage === "info" && (
           <motion.div
             key="info"
@@ -324,7 +374,6 @@ export default function Interview() {
           </motion.div>
         )}
 
-        {/* Prep & Recording */}
         {(stage === "prep" || stage === "recording") && currentQuestion && (
           <motion.div
             key={`q-${currentQ}-${stage}`}
@@ -334,7 +383,6 @@ export default function Interview() {
             className="w-full max-w-4xl px-4"
           >
             <div className="grid gap-6 lg:grid-cols-2 items-center">
-              {/* Question + Timer */}
               <div className="text-center space-y-6">
                 <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
                   {questions.map((_, i) => (
@@ -381,7 +429,6 @@ export default function Interview() {
                 )}
               </div>
 
-              {/* Camera */}
               <div className="relative">
                 <div className="glass-card overflow-hidden aspect-video">
                   <video ref={videoRef} muted className="w-full h-full object-cover" />
@@ -403,7 +450,6 @@ export default function Interview() {
           </motion.div>
         )}
 
-        {/* Complete */}
         {stage === "complete" && (
           <motion.div
             key="complete"

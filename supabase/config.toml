@@ -1,1 +1,4 @@
 project_id = "imqqdrkrxvmuovqjjscl"
+
+[functions.cleanup-videos]
+verify_jwt = false

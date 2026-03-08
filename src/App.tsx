@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 import Login from "./pages/Login";
 import AdminDashboard from "./pages/AdminDashboard";
 import TemplateBuilder from "./pages/TemplateBuilder";
+import TemplatesList from "./pages/TemplatesList";
 import SubmissionsReview from "./pages/SubmissionsReview";
 import Interview from "./pages/Interview";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -24,6 +25,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/login" element={<Login />} />
           <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+          <Route path="/admin/templates" element={<ProtectedRoute><TemplatesList /></ProtectedRoute>} />
           <Route path="/admin/templates/:id" element={<ProtectedRoute><TemplateBuilder /></ProtectedRoute>} />
           <Route path="/admin/submissions" element={<ProtectedRoute><SubmissionsReview /></ProtectedRoute>} />
           <Route path="/interview/:templateId" element={<Interview />} />

@@ -16,6 +16,7 @@ interface Question {
   order_index: number;
   prep_time_seconds: number;
   recording_duration_seconds: number;
+  _isNew?: boolean; // client-only flag
 }
 
 export default function TemplateBuilder() {
@@ -29,6 +30,7 @@ export default function TemplateBuilder() {
   const [questions, setQuestions] = useState<Question[]>([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(!isNew);
+  const [dbQuestionIds, setDbQuestionIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!isNew && id) loadTemplate();
@@ -51,9 +53,13 @@ export default function TemplateBuilder() {
       .from("questions")
       .select("*")
       .eq("template_id", id!)
+      .eq("is_deleted", false)
       .order("order_index");
 
-    if (qs) setQuestions(qs);
+    if (qs) {
+      setQuestions(qs);
+      setDbQuestionIds(new Set(qs.map((q) => q.id)));
+    }
     setLoading(false);
   };
 
@@ -66,6 +72,7 @@ export default function TemplateBuilder() {
         order_index: questions.length,
         prep_time_seconds: 30,
         recording_duration_seconds: 120,
+        _isNew: true,
       },
     ]);
   };
@@ -104,26 +111,59 @@ export default function TemplateBuilder() {
           .update({ title, description, is_active: isActive })
           .eq("id", id!);
         if (error) throw error;
-
-        // Delete existing questions and re-insert
-        await supabase.from("questions").delete().eq("template_id", id!);
       }
 
-      // Insert questions
-      if (questions.length > 0) {
-        const questionRows = questions.map((q, i) => ({
+      // Upsert strategy for questions
+      const currentQuestionIds = new Set(questions.map((q) => q.id));
+      const removedIds = [...dbQuestionIds].filter((dbId) => !currentQuestionIds.has(dbId));
+
+      // Handle removed questions
+      for (const removedId of removedIds) {
+        // Check if this question has linked answers
+        const { count } = await supabase
+          .from("submission_answers")
+          .select("id", { count: "exact", head: true })
+          .eq("question_id", removedId);
+
+        if (count && count > 0) {
+          // Soft-delete: has linked answers
+          await supabase
+            .from("questions")
+            .update({ is_deleted: true })
+            .eq("id", removedId);
+        } else {
+          // Hard delete: no linked answers
+          await supabase.from("questions").delete().eq("id", removedId);
+        }
+      }
+
+      // Update existing and insert new questions
+      for (let i = 0; i < questions.length; i++) {
+        const q = questions[i];
+        const row = {
           template_id: templateId!,
           question_text: q.question_text,
           order_index: i,
           prep_time_seconds: q.prep_time_seconds,
           recording_duration_seconds: q.recording_duration_seconds,
-        }));
-        const { error } = await supabase.from("questions").insert(questionRows);
-        if (error) throw error;
+        };
+
+        if (q._isNew || !dbQuestionIds.has(q.id)) {
+          // Insert new question
+          const { error } = await supabase.from("questions").insert(row);
+          if (error) throw error;
+        } else {
+          // Update existing question
+          const { error } = await supabase
+            .from("questions")
+            .update(row)
+            .eq("id", q.id);
+          if (error) throw error;
+        }
       }
 
       toast.success("Template saved!");
-      navigate("/admin");
+      navigate("/admin/templates");
     } catch (err: any) {
       toast.error(err.message || "Failed to save template");
     } finally {
@@ -143,7 +183,7 @@ export default function TemplateBuilder() {
     <AdminLayout>
       <div className="max-w-3xl mx-auto space-y-8">
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate("/admin")} className="p-2 rounded-lg hover:bg-secondary transition-colors">
+          <button onClick={() => navigate("/admin/templates")} className="p-2 rounded-lg hover:bg-secondary transition-colors">
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div>
