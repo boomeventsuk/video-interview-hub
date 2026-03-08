@@ -104,7 +104,7 @@ export default function TemplateBuilder() {
       if (isNew) {
         const { data, error } = await supabase
           .from("interview_templates")
-          .insert({ title, description, is_active: isActive, admin_id: user.id })
+          .insert({ title, description, is_active: isActive, admin_id: user.id, retakes_allowed: retakesAllowed, redirect_url: redirectUrl || null })
           .select("id")
           .single();
         if (error) throw error;
