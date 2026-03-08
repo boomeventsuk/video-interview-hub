@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ChevronDown, FileDown, StickyNote, Calendar, Share2 } from "lucide-react";
 import { Submission, statusOptions, statusLabels } from "./SubmissionCard";
 import { Answer } from "./AnswerCard";
@@ -25,6 +25,47 @@ export default function SubmissionDetail({
   const [notesOpen, setNotesOpen] = useState(!!submission.reviewer_notes);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [shareLoading, setShareLoading] = useState(false);
+  const [focusedAnswer, setFocusedAnswer] = useState(0);
+  const answerRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT") return;
+
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+        e.preventDefault();
+        setFocusedAnswer((prev) => {
+          const next = Math.min(prev + 1, answers.length - 1);
+          answerRefs.current[next]?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          return next;
+        });
+      } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+        e.preventDefault();
+        setFocusedAnswer((prev) => {
+          const next = Math.max(prev - 1, 0);
+          answerRefs.current[next]?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          return next;
+        });
+      } else if (e.key >= "1" && e.key <= "5" && answers.length > 0) {
+        e.preventDefault();
+        const ans = answers[focusedAnswer];
+        if (ans) onRate(ans.id, parseInt(e.key));
+      } else if (e.key === " ") {
+        e.preventDefault();
+        const ref = answerRefs.current[focusedAnswer];
+        if (ref) {
+          const video = ref.querySelector("video");
+          if (video) {
+            video.paused ? video.play() : video.pause();
+          }
+        }
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [answers, focusedAnswer, onRate]);
 
   const handleNotesBlur = () => {
     if (notes !== (submission.reviewer_notes || "")) {
@@ -113,19 +154,31 @@ export default function SubmissionDetail({
       {/* Answers */}
       <div className="space-y-4">
         {answers.map((ans, i) => (
-          <AnswerCard
+          <div
             key={ans.id}
-            answer={ans}
-            index={i}
-            onRate={onRate}
-            playbackRate={playbackRate}
-            onPlaybackRateChange={setPlaybackRate}
-          />
+            ref={(el) => { answerRefs.current[i] = el; }}
+            className={`rounded-lg transition-all ${focusedAnswer === i ? "ring-1 ring-primary/40" : ""}`}
+            onClick={() => setFocusedAnswer(i)}
+          >
+            <AnswerCard
+              answer={ans}
+              index={i}
+              onRate={onRate}
+              playbackRate={playbackRate}
+              onPlaybackRateChange={setPlaybackRate}
+            />
+          </div>
         ))}
         {answers.length === 0 && (
           <p className="text-center py-8 text-muted-foreground">No answers recorded.</p>
         )}
       </div>
+
+      {answers.length > 0 && (
+        <p className="text-xs text-muted-foreground/50 text-center">
+          Keyboard: arrows to navigate, space to play/pause, 1-5 to rate
+        </p>
+      )}
     </div>
   );
 }
