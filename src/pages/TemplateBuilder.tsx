@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion, Reorder } from "framer-motion";
-import { Plus, Trash2, GripVertical, Save, ArrowLeft, Clock, Video, CalendarIcon, Eye } from "lucide-react";
+import { Plus, Trash2, GripVertical, Save, ArrowLeft, Clock, Video, CalendarIcon, Eye, X, RotateCcw } from "lucide-react";
 import { format } from "date-fns";
 import AdminLayout from "@/components/AdminLayout";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import VideoRecorderDialog from "@/components/VideoRecorderDialog";
 
 interface Question {
   id: string;
@@ -44,6 +45,7 @@ export default function TemplateBuilder() {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(!isNew);
   const [dbQuestionIds, setDbQuestionIds] = useState<Set<string>>(new Set());
+  const [recordingQuestionId, setRecordingQuestionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isNew && id) loadTemplate();
@@ -105,8 +107,8 @@ export default function TemplateBuilder() {
     ]);
   };
 
-  const updateQuestion = (qId: string, field: keyof Question, value: string | number | boolean) => {
-    setQuestions(questions.map((q) => (q.id === qId ? { ...q, [field]: value } : q)));
+  const updateQuestion = (qId: string, field: keyof Question, value: string | number | boolean | null) => {
+    setQuestions(questions.map((q) => (q.id === qId ? { ...q, [field]: field === "video_prompt_url" && value === "" ? null : value } : q)));
   };
 
   const removeQuestion = (qId: string) => {
@@ -464,6 +466,33 @@ export default function TemplateBuilder() {
                         />
                         <Label htmlFor={`required-${q.id}`} className="text-xs">Required</Label>
                       </div>
+
+                      {/* Video Prompt */}
+                      <div className="space-y-2">
+                        {q.video_prompt_url ? (
+                          <div className="space-y-2">
+                            <Label className="text-xs">Video Prompt</Label>
+                            <video src={q.video_prompt_url} controls className="w-full max-w-xs rounded-lg border border-border" preload="metadata" />
+                            <div className="flex gap-2">
+                              <Button variant="ghost" size="sm" className="text-xs" onClick={() => setRecordingQuestionId(q.id)}>
+                                <RotateCcw className="h-3 w-3 mr-1" /> Re-record
+                              </Button>
+                              <Button variant="ghost" size="sm" className="text-xs text-destructive" onClick={() => updateQuestion(q.id, "video_prompt_url", "")}>
+                                <X className="h-3 w-3 mr-1" /> Remove
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs"
+                            onClick={() => setRecordingQuestionId(q.id)}
+                          >
+                            <Video className="h-3 w-3 mr-1" /> Record Video Prompt
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </motion.div>
@@ -485,6 +514,20 @@ export default function TemplateBuilder() {
           </button>
         </div>
       </div>
+
+      {/* Video Recorder Dialog for question prompts */}
+      <VideoRecorderDialog
+        open={!!recordingQuestionId}
+        onOpenChange={(open) => { if (!open) setRecordingQuestionId(null); }}
+        storagePath={`prompts/${id || "draft"}/${recordingQuestionId || "tmp"}.webm`}
+        onRecorded={(url) => {
+          if (recordingQuestionId) {
+            updateQuestion(recordingQuestionId, "video_prompt_url", url);
+          }
+          setRecordingQuestionId(null);
+        }}
+        title="Record Question Video Prompt"
+      />
     </AdminLayout>
   );
 }
