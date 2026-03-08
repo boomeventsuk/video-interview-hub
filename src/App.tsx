@@ -9,6 +9,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import TemplateBuilder from "./pages/TemplateBuilder";
 import TemplatesList from "./pages/TemplatesList";
 import SubmissionsReview from "./pages/SubmissionsReview";
+import Analytics from "./pages/Analytics";
 import Interview from "./pages/Interview";
 import ProtectedRoute from "./components/ProtectedRoute";
 import NotFound from "./pages/NotFound";
@@ -28,6 +29,7 @@ const App = () => (
           <Route path="/admin/templates" element={<ProtectedRoute><TemplatesList /></ProtectedRoute>} />
           <Route path="/admin/templates/:id" element={<ProtectedRoute><TemplateBuilder /></ProtectedRoute>} />
           <Route path="/admin/submissions" element={<ProtectedRoute><SubmissionsReview /></ProtectedRoute>} />
+          <Route path="/admin/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
           <Route path="/interview/:templateId" element={<Interview />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

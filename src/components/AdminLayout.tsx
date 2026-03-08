@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   FileText,
   Users,
+  BarChart3,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -24,6 +25,7 @@ const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
   { icon: FileText, label: "Templates", path: "/admin/templates" },
   { icon: Users, label: "Submissions", path: "/admin/submissions" },
+  { icon: BarChart3, label: "Analytics", path: "/admin/analytics" },
 ];
 
 function SidebarContent({
