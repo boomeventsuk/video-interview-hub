@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { User } from "lucide-react";
+import { User, Mail, Upload } from "lucide-react";
 import AdminLayout from "@/components/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -8,6 +8,8 @@ import SubmissionCard, { Submission } from "@/components/submissions/SubmissionC
 import SubmissionDetail from "@/components/submissions/SubmissionDetail";
 import SubmissionFilters from "@/components/submissions/SubmissionFilters";
 import { Answer } from "@/components/submissions/AnswerCard";
+import InviteCandidateDialog from "@/components/InviteCandidateDialog";
+import BulkInviteDialog from "@/components/BulkInviteDialog";
 
 export default function SubmissionsReview() {
   const [searchParams] = useSearchParams();
@@ -28,6 +30,10 @@ export default function SubmissionsReview() {
   // Bulk
   const [bulkMode, setBulkMode] = useState(false);
   const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set());
+
+  // Invite dialogs
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [bulkInviteOpen, setBulkInviteOpen] = useState(false);
 
   useEffect(() => {
     loadSubmissions();
@@ -197,14 +203,32 @@ export default function SubmissionsReview() {
   return (
     <AdminLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="font-display text-3xl font-bold">Submissions</h1>
-          <p className="mt-1 text-muted-foreground">
-            Review applicant video interviews
-            {submissions.length > 0 && (
-              <span className="ml-2 text-xs">({filtered.length} of {submissions.length})</span>
-            )}
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-display text-3xl font-bold">Submissions</h1>
+            <p className="mt-1 text-muted-foreground">
+              Review applicant video interviews
+              {submissions.length > 0 && (
+                <span className="ml-2 text-xs">({filtered.length} of {submissions.length})</span>
+              )}
+            </p>
+          </div>
+          {templates.length > 0 && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setInviteOpen(true)}
+                className="flex items-center gap-1.5 rounded-md bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
+              >
+                <Mail className="h-3.5 w-3.5" /> Invite
+              </button>
+              <button
+                onClick={() => setBulkInviteOpen(true)}
+                className="flex items-center gap-1.5 rounded-md bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
+              >
+                <Upload className="h-3.5 w-3.5" /> Bulk Invite
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
@@ -282,6 +306,32 @@ export default function SubmissionsReview() {
           </div>
         </div>
       </div>
+      {templates.length > 0 && (
+        <>
+          <InviteCandidateDialog
+            open={inviteOpen}
+            onOpenChange={setInviteOpen}
+            templateId={activeTemplateFilter !== "all" ? activeTemplateFilter : templates[0].id}
+            templateTitle={
+              activeTemplateFilter !== "all"
+                ? templates.find((t) => t.id === activeTemplateFilter)?.title || templates[0].title
+                : templates[0].title
+            }
+            onInvited={loadSubmissions}
+          />
+          <BulkInviteDialog
+            open={bulkInviteOpen}
+            onOpenChange={setBulkInviteOpen}
+            templateId={activeTemplateFilter !== "all" ? activeTemplateFilter : templates[0].id}
+            templateTitle={
+              activeTemplateFilter !== "all"
+                ? templates.find((t) => t.id === activeTemplateFilter)?.title || templates[0].title
+                : templates[0].title
+            }
+            onInvited={loadSubmissions}
+          />
+        </>
+      )}
     </AdminLayout>
   );
 }

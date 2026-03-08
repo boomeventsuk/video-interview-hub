@@ -14,24 +14,30 @@ export interface Submission {
 }
 
 export const statusColors: Record<string, string> = {
+  invited: "bg-accent/10 text-accent/70",
+  started: "bg-accent/20 text-accent",
   new: "bg-accent/20 text-accent",
   in_review: "bg-[hsl(var(--warning))]/20 text-[hsl(var(--warning))]",
   reviewed: "bg-[hsl(var(--warning))]/20 text-[hsl(var(--warning))]",
   shortlisted: "bg-[hsl(var(--success))]/20 text-[hsl(var(--success))]",
   on_hold: "bg-muted text-muted-foreground",
   rejected: "bg-destructive/20 text-destructive",
+  expired: "bg-muted text-muted-foreground/50",
 };
 
 export const statusLabels: Record<string, string> = {
+  invited: "Invited",
+  started: "Started",
   new: "New",
   in_review: "In Review",
   reviewed: "Reviewed",
   shortlisted: "Shortlisted",
   on_hold: "On Hold",
   rejected: "Rejected",
+  expired: "Expired",
 };
 
-export const statusOptions = ["new", "in_review", "reviewed", "shortlisted", "on_hold", "rejected"];
+export const statusOptions = ["invited", "started", "new", "in_review", "reviewed", "shortlisted", "on_hold", "rejected"];
 
 interface Props {
   sub: Submission;

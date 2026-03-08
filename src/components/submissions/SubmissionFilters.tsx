@@ -22,9 +22,11 @@ interface Props {
   onExport: () => void;
 }
 
-const statusOptions = ["all", "new", "in_review", "reviewed", "shortlisted", "on_hold", "rejected"];
+const statusOptions = ["all", "invited", "started", "new", "in_review", "reviewed", "shortlisted", "on_hold", "rejected"];
 const statusLabels: Record<string, string> = {
   all: "All statuses",
+  invited: "Invited",
+  started: "Started",
   new: "New",
   in_review: "In Review",
   reviewed: "Reviewed",

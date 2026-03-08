@@ -65,6 +65,7 @@ export default function Interview() {
   const { templateId } = useParams();
   const [searchParams] = useSearchParams();
   const isPreview = searchParams.get("preview") === "true";
+  const prefilledSubmissionId = searchParams.get("submission");
 
   const [templateTitle, setTemplateTitle] = useState("");
   const [templateDesc, setTemplateDesc] = useState("");
@@ -199,6 +200,26 @@ export default function Interview() {
         video_prompt_url: q.video_prompt_url || null,
       }))
     );
+
+    // Pre-fill from invitation
+    if (prefilledSubmissionId) {
+      const { data: sub } = await supabase
+        .from("submissions")
+        .select("id, applicant_name, applicant_email, status")
+        .eq("id", prefilledSubmissionId)
+        .maybeSingle();
+      if (sub) {
+        const s = sub as any;
+        setName(s.applicant_name || "");
+        setEmail(s.applicant_email || "");
+        setSubmissionId(s.id);
+        // Update status to started
+        if (s.status === "invited") {
+          await supabase.from("submissions").update({ status: "started", started_at: new Date().toISOString() } as any).eq("id", s.id);
+        }
+      }
+    }
+
     setLoading(false);
   };
 
@@ -222,6 +243,20 @@ export default function Interview() {
 
     if (isPreview) {
       setSubmissionId("preview");
+      setStage("setup");
+      return;
+    }
+
+    // If pre-filled from invitation, skip creating a new submission
+    if (submissionId && submissionId !== "preview") {
+      // Update name/email in case they changed it
+      await supabase.from("submissions").update({
+        applicant_name: name,
+        applicant_email: email,
+        user_agent: navigator.userAgent,
+        started_at: new Date().toISOString(),
+        status: "started",
+      } as any).eq("id", submissionId);
       setStage("setup");
       return;
     }
@@ -366,6 +401,13 @@ export default function Interview() {
     } else {
       stopStream();
       setStage("complete");
+      // Mark submission as completed
+      if (submissionId && submissionId !== "preview") {
+        supabase.from("submissions").update({
+          status: "new",
+          completed_at: new Date().toISOString(),
+        } as any).eq("id", submissionId);
+      }
     }
   };
 
