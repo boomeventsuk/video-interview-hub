@@ -21,6 +21,8 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean
+          redirect_url: string | null
+          retakes_allowed: number
           title: string
           updated_at: string
         }
@@ -30,6 +32,8 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          redirect_url?: string | null
+          retakes_allowed?: number
           title: string
           updated_at?: string
         }
@@ -39,6 +43,8 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean
+          redirect_url?: string | null
+          retakes_allowed?: number
           title?: string
           updated_at?: string
         }
