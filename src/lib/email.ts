@@ -7,7 +7,7 @@ interface SendEmailOptions {
   html: string;
   submissionId?: string;
   templateId?: string;
-  templateType: "invite" | "reminder" | "share";
+  templateType: "invite" | "reminder" | "share" | "team_invite";
 }
 
 export async function sendEmail(options: SendEmailOptions): Promise<{ success: boolean; error?: string }> {

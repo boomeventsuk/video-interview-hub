@@ -13,6 +13,8 @@ import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import Interview from "./pages/Interview";
 import ShareReview from "./pages/ShareReview";
+import TeamSettings from "./pages/TeamSettings";
+import JoinTeam from "./pages/JoinTeam";
 import ProtectedRoute from "./components/ProtectedRoute";
 import NotFound from "./pages/NotFound";
 
@@ -33,7 +35,9 @@ const App = () => (
           <Route path="/admin/submissions" element={<ProtectedRoute><SubmissionsReview /></ProtectedRoute>} />
           <Route path="/admin/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
           <Route path="/admin/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+          <Route path="/admin/team" element={<ProtectedRoute><TeamSettings /></ProtectedRoute>} />
           <Route path="/interview/:templateId" element={<Interview />} />
+          <Route path="/join/:token" element={<JoinTeam />} />
           <Route path="/review/:token" element={<ShareReview />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
