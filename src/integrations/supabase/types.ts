@@ -72,6 +72,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_deleted: boolean
           order_index: number
           prep_time_seconds: number
           question_text: string
@@ -81,6 +82,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_deleted?: boolean
           order_index?: number
           prep_time_seconds?: number
           question_text: string
@@ -90,6 +92,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_deleted?: boolean
           order_index?: number
           prep_time_seconds?: number
           question_text?: string
