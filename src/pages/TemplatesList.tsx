@@ -8,6 +8,7 @@ import { format, isPast } from "date-fns";
 import AdminLayout from "@/components/AdminLayout";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
@@ -173,13 +174,45 @@ export default function TemplatesList() {
 
         {/* List */}
         {loading ? (
-          <div className="text-center py-12 text-muted-foreground">Loading...</div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="glass-card p-6 space-y-3">
+                <div className="flex justify-between">
+                  <Skeleton className="h-5 w-36" />
+                  <Skeleton className="h-5 w-14 rounded-full" />
+                </div>
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-2/3" />
+                <div className="flex gap-4">
+                  <Skeleton className="h-3 w-20" />
+                  <Skeleton className="h-3 w-24" />
+                </div>
+                <div className="flex gap-2">
+                  <Skeleton className="h-7 w-16 rounded-md" />
+                  <Skeleton className="h-7 w-16 rounded-md" />
+                  <Skeleton className="h-7 w-16 rounded-md" />
+                </div>
+              </div>
+            ))}
+          </div>
         ) : filtered.length === 0 ? (
-          <div className="glass-card p-12 text-center">
-            <FileText className="mx-auto h-12 w-12 text-muted-foreground/50 mb-4" />
-            <p className="text-muted-foreground">
-              {search || deptFilter !== "all" ? "No templates match your filters." : "No templates yet. Create your first one!"}
-            </p>
+          <div className="glass-card p-12 text-center space-y-4">
+            <FileText className="mx-auto h-16 w-16 text-muted-foreground/30" />
+            <div>
+              <h3 className="font-display text-lg font-semibold">
+                {search || deptFilter !== "all" ? "No matching templates" : "No templates yet"}
+              </h3>
+              <p className="text-muted-foreground text-sm mt-1">
+                {search || deptFilter !== "all"
+                  ? "Try adjusting your search or filters."
+                  : "Create your first interview template to get started."}
+              </p>
+            </div>
+            {!search && deptFilter === "all" && (
+              <Link to="/admin/templates/new" className="glow-button inline-flex items-center gap-2 text-sm">
+                <Plus className="h-4 w-4" /> Create Template
+              </Link>
+            )}
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

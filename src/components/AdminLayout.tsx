@@ -7,6 +7,7 @@ import {
   Users,
   BarChart3,
   Settings,
+  UsersRound,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -27,6 +28,7 @@ const navItems = [
   { icon: FileText, label: "Templates", path: "/admin/templates" },
   { icon: Users, label: "Submissions", path: "/admin/submissions" },
   { icon: BarChart3, label: "Analytics", path: "/admin/analytics" },
+  { icon: UsersRound, label: "Team", path: "/admin/team" },
   { icon: Settings, label: "Settings", path: "/admin/settings" },
 ];
 
