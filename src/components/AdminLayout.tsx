@@ -6,6 +6,7 @@ import {
   FileText,
   Users,
   BarChart3,
+  Settings,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -26,6 +27,7 @@ const navItems = [
   { icon: FileText, label: "Templates", path: "/admin/templates" },
   { icon: Users, label: "Submissions", path: "/admin/submissions" },
   { icon: BarChart3, label: "Analytics", path: "/admin/analytics" },
+  { icon: Settings, label: "Settings", path: "/admin/settings" },
 ];
 
 function SidebarContent({

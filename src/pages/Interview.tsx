@@ -4,6 +4,7 @@ import { AnimatePresence } from "framer-motion";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useBranding } from "@/hooks/useBranding";
 
 import WelcomeScreen from "@/components/interview/WelcomeScreen";
 import InfoScreen from "@/components/interview/InfoScreen";
@@ -66,6 +67,7 @@ export default function Interview() {
   const [searchParams] = useSearchParams();
   const isPreview = searchParams.get("preview") === "true";
   const prefilledSubmissionId = searchParams.get("submission");
+  const branding = useBranding(true);
 
   const [templateTitle, setTemplateTitle] = useState("");
   const [templateDesc, setTemplateDesc] = useState("");
@@ -485,6 +487,11 @@ export default function Interview() {
       {isPreview && (
         <div className="absolute top-0 left-0 right-0 bg-primary text-primary-foreground text-center py-2 text-sm font-medium z-50">
           PREVIEW MODE — No data will be saved
+        </div>
+      )}
+      {branding.logoUrl && (
+        <div className={`absolute left-6 z-40 ${isPreview ? "top-14" : "top-6"}`}>
+          <img src={branding.logoUrl} alt={branding.companyName} className="h-10 rounded" />
         </div>
       )}
       <AnimatePresence mode="wait">

@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { User, Calendar, Star, AlertCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useBranding } from "@/hooks/useBranding";
 import VideoPlayer from "@/components/submissions/VideoPlayer";
 import StarRating from "@/components/submissions/StarRating";
 
@@ -23,6 +24,7 @@ interface ReviewData {
 
 export default function ShareReview() {
   const { token } = useParams();
+  const branding = useBranding(true);
   const [data, setData] = useState<ReviewData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -146,6 +148,14 @@ export default function ShareReview() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-3xl mx-auto p-6 space-y-8">
+        {/* Branding */}
+        {branding.logoUrl && (
+          <div className="flex items-center gap-3">
+            <img src={branding.logoUrl} alt={branding.companyName} className="h-8 rounded" />
+            {branding.companyName && <span className="text-sm text-muted-foreground">{branding.companyName}</span>}
+          </div>
+        )}
+
         {/* Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}

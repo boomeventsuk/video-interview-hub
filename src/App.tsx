@@ -10,6 +10,7 @@ import TemplateBuilder from "./pages/TemplateBuilder";
 import TemplatesList from "./pages/TemplatesList";
 import SubmissionsReview from "./pages/SubmissionsReview";
 import Analytics from "./pages/Analytics";
+import Settings from "./pages/Settings";
 import Interview from "./pages/Interview";
 import ShareReview from "./pages/ShareReview";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -31,6 +32,7 @@ const App = () => (
           <Route path="/admin/templates/:id" element={<ProtectedRoute><TemplateBuilder /></ProtectedRoute>} />
           <Route path="/admin/submissions" element={<ProtectedRoute><SubmissionsReview /></ProtectedRoute>} />
           <Route path="/admin/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
+          <Route path="/admin/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
           <Route path="/interview/:templateId" element={<Interview />} />
           <Route path="/review/:token" element={<ShareReview />} />
           <Route path="*" element={<NotFound />} />
