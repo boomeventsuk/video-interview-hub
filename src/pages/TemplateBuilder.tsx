@@ -364,12 +364,21 @@ export default function TemplateBuilder() {
                 </Button>
               </div>
             ) : (
-              <div>
-                <label className="flex items-center gap-2 rounded-md bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors cursor-pointer w-fit">
-                  <Video className="h-4 w-4" /> Upload intro video
-                  <input type="file" accept="video/*" className="hidden" onChange={handleIntroVideoUpload} />
-                </label>
-                <p className="text-xs text-muted-foreground mt-1">Shown to candidates before they start. Max 100 MB.</p>
+              <div className="space-y-2">
+                <div className="flex gap-2">
+                  <label className="flex items-center gap-2 rounded-md bg-secondary px-3 py-2 text-sm font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors cursor-pointer">
+                    <Video className="h-4 w-4" /> Upload
+                    <input type="file" accept="video/*" className="hidden" onChange={handleIntroVideoUpload} />
+                  </label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setRecordingQuestionId("__intro__")}
+                  >
+                    <Video className="h-4 w-4 mr-1" /> Record
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">Shown to candidates before they start. Max 100 MB.</p>
               </div>
             )}
           </div>
@@ -515,18 +524,24 @@ export default function TemplateBuilder() {
         </div>
       </div>
 
-      {/* Video Recorder Dialog for question prompts */}
+      {/* Video Recorder Dialog for question prompts and intro video */}
       <VideoRecorderDialog
         open={!!recordingQuestionId}
         onOpenChange={(open) => { if (!open) setRecordingQuestionId(null); }}
-        storagePath={`prompts/${id || "draft"}/${recordingQuestionId || "tmp"}.webm`}
+        storagePath={
+          recordingQuestionId === "__intro__"
+            ? `intros/${id || "draft"}-recorded.webm`
+            : `prompts/${id || "draft"}/${recordingQuestionId || "tmp"}.webm`
+        }
         onRecorded={(url) => {
-          if (recordingQuestionId) {
+          if (recordingQuestionId === "__intro__") {
+            setIntroVideoUrl(url);
+          } else if (recordingQuestionId) {
             updateQuestion(recordingQuestionId, "video_prompt_url", url);
           }
           setRecordingQuestionId(null);
         }}
-        title="Record Question Video Prompt"
+        title={recordingQuestionId === "__intro__" ? "Record Intro Video" : "Record Question Video Prompt"}
       />
     </AdminLayout>
   );
