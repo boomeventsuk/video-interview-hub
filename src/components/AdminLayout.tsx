@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   FileText,
   Users,
+  BarChart3,
   LogOut,
   ChevronLeft,
   ChevronRight,
