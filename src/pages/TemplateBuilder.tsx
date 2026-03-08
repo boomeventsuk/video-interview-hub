@@ -27,6 +27,8 @@ export default function TemplateBuilder() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [isActive, setIsActive] = useState(true);
+  const [retakesAllowed, setRetakesAllowed] = useState(1);
+  const [redirectUrl, setRedirectUrl] = useState("");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(!isNew);
