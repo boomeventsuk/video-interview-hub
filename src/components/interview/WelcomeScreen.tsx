@@ -5,10 +5,11 @@ interface WelcomeScreenProps {
   title: string;
   description: string;
   questionCount: number;
+  introVideoUrl?: string | null;
   onBegin: () => void;
 }
 
-export default function WelcomeScreen({ title, description, questionCount, onBegin }: WelcomeScreenProps) {
+export default function WelcomeScreen({ title, description, questionCount, introVideoUrl, onBegin }: WelcomeScreenProps) {
   return (
     <motion.div
       key="welcome"
@@ -23,6 +24,14 @@ export default function WelcomeScreen({ title, description, questionCount, onBeg
         </div>
         <h1 className="font-display text-3xl font-bold">{title}</h1>
         {description && <p className="text-muted-foreground">{description}</p>}
+        {introVideoUrl && (
+          <video
+            src={introVideoUrl}
+            controls
+            className="w-full rounded-lg border border-border"
+            preload="metadata"
+          />
+        )}
         <p className="text-sm text-muted-foreground">
           {questionCount} question{questionCount !== 1 ? "s" : ""} • Timed recording
         </p>

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Plus, Copy, Eye, FileText, Users, Activity } from "lucide-react";
 import AdminLayout from "@/components/AdminLayout";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -10,6 +11,7 @@ interface Template {
   id: string;
   title: string;
   description: string;
+  department: string | null;
   is_active: boolean;
   created_at: string;
   question_count: number;
@@ -21,14 +23,13 @@ export default function AdminDashboard() {
   const [totalSubmissions, setTotalSubmissions] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
     const { data: temps } = await supabase
       .from("interview_templates")
       .select("*, questions(id), submissions(id)")
+      .eq("is_deleted", false)
       .order("created_at", { ascending: false });
 
     if (temps) {
@@ -44,8 +45,7 @@ export default function AdminDashboard() {
   };
 
   const copyLink = (id: string) => {
-    const url = `${window.location.origin}/interview/${id}`;
-    navigator.clipboard.writeText(url);
+    navigator.clipboard.writeText(`${window.location.origin}/interview/${id}`);
     toast.success("Interview link copied!");
   };
 
@@ -84,9 +84,7 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">{stat.label}</p>
-                  <p className={`font-display text-2xl font-bold stat-glow ${stat.color}`}>
-                    {stat.value}
-                  </p>
+                  <p className={`font-display text-2xl font-bold stat-glow ${stat.color}`}>{stat.value}</p>
                 </div>
               </div>
             </motion.div>
@@ -117,14 +115,15 @@ export default function AdminDashboard() {
                     <h3 className="font-display font-semibold text-lg leading-tight">{template.title}</h3>
                     <span
                       className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
-                        template.is_active
-                          ? "bg-success/20 text-success"
-                          : "bg-muted text-muted-foreground"
+                        template.is_active ? "bg-success/20 text-success" : "bg-muted text-muted-foreground"
                       }`}
                     >
                       {template.is_active ? "Active" : "Inactive"}
                     </span>
                   </div>
+                  {template.department && (
+                    <Badge variant="secondary" className="mb-2 text-xs">{template.department}</Badge>
+                  )}
                   <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
                     {template.description || "No description"}
                   </p>
