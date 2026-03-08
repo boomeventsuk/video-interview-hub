@@ -27,6 +27,8 @@ export default function TemplateBuilder() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [isActive, setIsActive] = useState(true);
+  const [retakesAllowed, setRetakesAllowed] = useState(1);
+  const [redirectUrl, setRedirectUrl] = useState("");
   const [questions, setQuestions] = useState<Question[]>([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(!isNew);
@@ -47,6 +49,8 @@ export default function TemplateBuilder() {
       setTitle(template.title);
       setDescription(template.description || "");
       setIsActive(template.is_active);
+      setRetakesAllowed(template.retakes_allowed ?? 1);
+      setRedirectUrl(template.redirect_url || "");
     }
 
     const { data: qs } = await supabase
@@ -100,7 +104,7 @@ export default function TemplateBuilder() {
       if (isNew) {
         const { data, error } = await supabase
           .from("interview_templates")
-          .insert({ title, description, is_active: isActive, admin_id: user.id })
+          .insert({ title, description, is_active: isActive, admin_id: user.id, retakes_allowed: retakesAllowed, redirect_url: redirectUrl || null })
           .select("id")
           .single();
         if (error) throw error;
@@ -108,7 +112,7 @@ export default function TemplateBuilder() {
       } else {
         const { error } = await supabase
           .from("interview_templates")
-          .update({ title, description, is_active: isActive })
+          .update({ title, description, is_active: isActive, retakes_allowed: retakesAllowed, redirect_url: redirectUrl || null })
           .eq("id", id!);
         if (error) throw error;
       }
@@ -216,8 +220,36 @@ export default function TemplateBuilder() {
             />
           </div>
           <div className="flex items-center gap-3">
-            <Switch checked={isActive} onCheckedChange={setIsActive} />
-            <Label>Active (accepting submissions)</Label>
+            <Switch checked={isActive} onCheckedChange={setIsActive} id="is-active" />
+            <Label htmlFor="is-active">Active (accepting submissions)</Label>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="retakes">Retakes Allowed</Label>
+              <select
+                id="retakes"
+                value={retakesAllowed}
+                onChange={(e) => setRetakesAllowed(parseInt(e.target.value))}
+                className="flex h-10 w-full rounded-md border border-input bg-secondary/50 px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value={0}>No retakes</option>
+                <option value={1}>1 retake</option>
+                <option value={2}>2 retakes</option>
+                <option value={3}>3 retakes</option>
+                <option value={-1}>Unlimited</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="redirect-url">Redirect URL (optional)</Label>
+              <Input
+                id="redirect-url"
+                value={redirectUrl}
+                onChange={(e) => setRedirectUrl(e.target.value)}
+                placeholder="https://yoursite.com/thanks"
+                className="bg-secondary/50 border-border/50"
+              />
+            </div>
           </div>
         </div>
 
