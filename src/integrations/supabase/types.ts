@@ -141,6 +141,7 @@ export type Database = {
           created_at: string
           id: string
           question_id: string
+          rating: number | null
           submission_id: string
           video_url: string | null
         }
@@ -148,6 +149,7 @@ export type Database = {
           created_at?: string
           id?: string
           question_id: string
+          rating?: number | null
           submission_id: string
           video_url?: string | null
         }
@@ -155,6 +157,7 @@ export type Database = {
           created_at?: string
           id?: string
           question_id?: string
+          rating?: number | null
           submission_id?: string
           video_url?: string | null
         }
@@ -181,6 +184,8 @@ export type Database = {
           applicant_name: string
           created_at: string
           id: string
+          overall_rating: number | null
+          reviewer_notes: string | null
           status: string
           template_id: string
           updated_at: string
@@ -190,6 +195,8 @@ export type Database = {
           applicant_name: string
           created_at?: string
           id?: string
+          overall_rating?: number | null
+          reviewer_notes?: string | null
           status?: string
           template_id: string
           updated_at?: string
@@ -199,6 +206,8 @@ export type Database = {
           applicant_name?: string
           created_at?: string
           id?: string
+          overall_rating?: number | null
+          reviewer_notes?: string | null
           status?: string
           template_id?: string
           updated_at?: string
