@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { Video, SkipForward } from "lucide-react";
 import ProgressRing from "./ProgressRing";
@@ -43,12 +44,21 @@ export default function QuestionScreen({
   const timeRatio = totalTime > 0 ? (totalTime - timer) / totalTime : 0;
   const progressPercent = ((questionIndex + (stage === "recording" ? 0.5 : 0)) / totalQuestions) * 100;
 
-  let ringVariant: "primary" | "destructive" | "warning" = stage === "recording" ? "destructive" : "primary";
+  let ringVariant: "primary" | "destructive" | "warning" = "primary";
   if (stage === "recording" && totalTime > 0) {
     if (timeRatio >= 0.95) ringVariant = "destructive";
     else if (timeRatio >= 0.8) ringVariant = "warning";
-    else ringVariant = "destructive";
+    else ringVariant = "primary";
   }
+
+  // Screen reader announcement every 15 seconds
+  const srAnnouncement = useMemo(() => {
+    if (timer <= 0) return "";
+    if (timer % 15 === 0 || timer === 10 || timer === 5) {
+      return `${formatTime(timer)} ${stage === "prep" ? "of preparation time" : "of recording time"} remaining`;
+    }
+    return "";
+  }, [timer, stage]);
 
   return (
     <motion.div
@@ -138,6 +148,11 @@ export default function QuestionScreen({
               <span>Elapsed: {formatTime(elapsed)}</span>
             </div>
           )}
+
+          {/* Screen reader periodic announcements */}
+          <div className="sr-only" aria-live="assertive" aria-atomic="true">
+            {srAnnouncement}
+          </div>
 
           <div className="flex flex-col items-center gap-3">
             {stage === "prep" && (
