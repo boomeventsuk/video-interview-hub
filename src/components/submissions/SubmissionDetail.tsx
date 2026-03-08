@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { ChevronDown, FileDown, StickyNote } from "lucide-react";
-import { Submission, statusOptions } from "./SubmissionCard";
+import { ChevronDown, FileDown, StickyNote, Calendar, Share2 } from "lucide-react";
+import { Submission, statusOptions, statusLabels } from "./SubmissionCard";
 import { Answer } from "./AnswerCard";
 import AnswerCard from "./AnswerCard";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
 interface Props {
   submission: Submission;
@@ -21,10 +23,32 @@ export default function SubmissionDetail({
 }: Props) {
   const [notes, setNotes] = useState(submission.reviewer_notes || "");
   const [notesOpen, setNotesOpen] = useState(!!submission.reviewer_notes);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [shareLoading, setShareLoading] = useState(false);
 
   const handleNotesBlur = () => {
     if (notes !== (submission.reviewer_notes || "")) {
       onNotesChange(notes);
+    }
+  };
+
+  const createShareLink = async () => {
+    setShareLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data, error } = await supabase
+        .from("share_links")
+        .insert({ submission_id: submission.id, created_by: user?.id } as any)
+        .select("token")
+        .single();
+      if (error) throw error;
+      const url = `${window.location.origin}/review/${(data as any).token}`;
+      await navigator.clipboard.writeText(url);
+      toast.success("Share link copied to clipboard!");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to create share link");
+    } finally {
+      setShareLoading(false);
     }
   };
 
@@ -35,8 +59,19 @@ export default function SubmissionDetail({
         <div>
           <h2 className="font-display text-xl font-semibold">{submission.applicant_name}</h2>
           <p className="text-sm text-muted-foreground">{submission.applicant_email}</p>
+          <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+            <Calendar className="h-3 w-3" />
+            Submitted {new Date(submission.created_at).toLocaleString()}
+          </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={createShareLink}
+            disabled={shareLoading}
+            className="flex items-center gap-1 rounded-md bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
+          >
+            <Share2 className="h-3 w-3" /> {shareLoading ? "..." : "Share"}
+          </button>
           <div className="relative">
             <select
               value={submission.status}
@@ -45,7 +80,7 @@ export default function SubmissionDetail({
             >
               {statusOptions.map((s) => (
                 <option key={s} value={s}>
-                  {s.charAt(0).toUpperCase() + s.slice(1)}
+                  {statusLabels[s] || s}
                 </option>
               ))}
             </select>
@@ -78,7 +113,14 @@ export default function SubmissionDetail({
       {/* Answers */}
       <div className="space-y-4">
         {answers.map((ans, i) => (
-          <AnswerCard key={ans.id} answer={ans} index={i} onRate={onRate} />
+          <AnswerCard
+            key={ans.id}
+            answer={ans}
+            index={i}
+            onRate={onRate}
+            playbackRate={playbackRate}
+            onPlaybackRateChange={setPlaybackRate}
+          />
         ))}
         {answers.length === 0 && (
           <p className="text-center py-8 text-muted-foreground">No answers recorded.</p>

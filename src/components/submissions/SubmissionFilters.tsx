@@ -1,5 +1,10 @@
 import { Search, Filter, Download, CheckSquare } from "lucide-react";
 
+interface TemplateOption {
+  id: string;
+  title: string;
+}
+
 interface Props {
   search: string;
   onSearchChange: (v: string) => void;
@@ -7,6 +12,9 @@ interface Props {
   onStatusFilterChange: (v: string) => void;
   sortBy: string;
   onSortChange: (v: string) => void;
+  templateFilter: string;
+  onTemplateFilterChange: (v: string) => void;
+  templates: TemplateOption[];
   bulkMode: boolean;
   onBulkToggle: () => void;
   selectedCount: number;
@@ -14,7 +22,16 @@ interface Props {
   onExport: () => void;
 }
 
-const statusOptions = ["all", "new", "reviewed", "shortlisted", "rejected"];
+const statusOptions = ["all", "new", "in_review", "reviewed", "shortlisted", "on_hold", "rejected"];
+const statusLabels: Record<string, string> = {
+  all: "All statuses",
+  new: "New",
+  in_review: "In Review",
+  reviewed: "Reviewed",
+  shortlisted: "Shortlisted",
+  on_hold: "On Hold",
+  rejected: "Rejected",
+};
 const sortOptions = [
   { value: "date-desc", label: "Newest first" },
   { value: "date-asc", label: "Oldest first" },
@@ -30,6 +47,9 @@ export default function SubmissionFilters({
   onStatusFilterChange,
   sortBy,
   onSortChange,
+  templateFilter,
+  onTemplateFilterChange,
+  templates,
   bulkMode,
   onBulkToggle,
   selectedCount,
@@ -61,11 +81,22 @@ export default function SubmissionFilters({
           >
             {statusOptions.map((s) => (
               <option key={s} value={s}>
-                {s === "all" ? "All statuses" : s.charAt(0).toUpperCase() + s.slice(1)}
+                {statusLabels[s] || s}
               </option>
             ))}
           </select>
         </div>
+
+        <select
+          value={templateFilter}
+          onChange={(e) => onTemplateFilterChange(e.target.value)}
+          className="rounded-md bg-secondary/50 border border-border/50 px-2 py-1 text-xs text-foreground cursor-pointer"
+        >
+          <option value="all">All templates</option>
+          {templates.map((t) => (
+            <option key={t.id} value={t.id}>{t.title}</option>
+          ))}
+        </select>
 
         <select
           value={sortBy}
@@ -106,13 +137,13 @@ export default function SubmissionFilters({
         <div className="flex items-center gap-2 rounded-lg bg-primary/10 border border-primary/20 px-3 py-2 text-xs">
           <span className="text-primary font-medium">{selectedCount} selected</span>
           <span className="text-muted-foreground">→</span>
-          {["reviewed", "shortlisted", "rejected"].map((s) => (
+          {["in_review", "reviewed", "shortlisted", "on_hold", "rejected"].map((s) => (
             <button
               key={s}
               onClick={() => onBulkAction(s)}
               className="rounded-md bg-secondary px-2 py-1 text-foreground hover:bg-secondary/80 transition-colors"
             >
-              {s.charAt(0).toUpperCase() + s.slice(1)}
+              {statusLabels[s] || s}
             </button>
           ))}
         </div>

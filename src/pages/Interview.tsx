@@ -229,7 +229,7 @@ export default function Interview() {
     setSubmitting(true);
     const { data, error } = await supabase
       .from("submissions")
-      .insert({ template_id: templateId!, applicant_name: name, applicant_email: email })
+      .insert({ template_id: templateId!, applicant_name: name, applicant_email: email, user_agent: navigator.userAgent } as any)
       .select("id")
       .single();
 

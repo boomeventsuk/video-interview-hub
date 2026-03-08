@@ -15,12 +15,23 @@ export interface Submission {
 
 export const statusColors: Record<string, string> = {
   new: "bg-accent/20 text-accent",
+  in_review: "bg-[hsl(var(--warning))]/20 text-[hsl(var(--warning))]",
   reviewed: "bg-[hsl(var(--warning))]/20 text-[hsl(var(--warning))]",
   shortlisted: "bg-[hsl(var(--success))]/20 text-[hsl(var(--success))]",
+  on_hold: "bg-muted text-muted-foreground",
   rejected: "bg-destructive/20 text-destructive",
 };
 
-export const statusOptions = ["new", "reviewed", "shortlisted", "rejected"];
+export const statusLabels: Record<string, string> = {
+  new: "New",
+  in_review: "In Review",
+  reviewed: "Reviewed",
+  shortlisted: "Shortlisted",
+  on_hold: "On Hold",
+  rejected: "Rejected",
+};
+
+export const statusOptions = ["new", "in_review", "reviewed", "shortlisted", "on_hold", "rejected"];
 
 interface Props {
   sub: Submission;
@@ -51,7 +62,7 @@ export default function SubmissionCard({ sub, index, isSelected, onClick }: Prop
           </div>
         </div>
         <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusColors[sub.status] || ""}`}>
-          {sub.status}
+          {statusLabels[sub.status] || sub.status}
         </span>
       </div>
       <div className="flex items-center gap-3 text-xs text-muted-foreground">

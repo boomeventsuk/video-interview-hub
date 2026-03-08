@@ -17,11 +17,13 @@ export default function SubmissionsReview() {
   const [selected, setSelected] = useState<Submission | null>(null);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [templates, setTemplates] = useState<{ id: string; title: string }[]>([]);
 
   // Filters
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [sortBy, setSortBy] = useState("date-desc");
+  const [activeTemplateFilter, setActiveTemplateFilter] = useState(templateFilter || "all");
 
   // Bulk
   const [bulkMode, setBulkMode] = useState(false);
@@ -29,6 +31,7 @@ export default function SubmissionsReview() {
 
   useEffect(() => {
     loadSubmissions();
+    loadTemplates();
   }, [templateFilter]);
 
   const loadSubmissions = async () => {
@@ -49,6 +52,15 @@ export default function SubmissionsReview() {
       );
     }
     setLoading(false);
+  };
+
+  const loadTemplates = async () => {
+    const { data } = await supabase
+      .from("interview_templates")
+      .select("id, title")
+      .eq("is_deleted", false)
+      .order("title");
+    if (data) setTemplates(data);
   };
 
   const loadAnswers = async (sub: Submission) => {
@@ -152,6 +164,10 @@ export default function SubmissionsReview() {
       result = result.filter((s) => s.status === statusFilter);
     }
 
+    if (activeTemplateFilter !== "all") {
+      result = result.filter((s) => s.template_id === activeTemplateFilter);
+    }
+
     result.sort((a, b) => {
       switch (sortBy) {
         case "date-asc":
@@ -168,7 +184,7 @@ export default function SubmissionsReview() {
     });
 
     return result;
-  }, [submissions, search, statusFilter, sortBy]);
+  }, [submissions, search, statusFilter, sortBy, activeTemplateFilter]);
 
   const toggleBulkItem = (id: string) => {
     setBulkSelected((prev) => {
@@ -201,6 +217,9 @@ export default function SubmissionsReview() {
               onStatusFilterChange={setStatusFilter}
               sortBy={sortBy}
               onSortChange={setSortBy}
+              templateFilter={activeTemplateFilter}
+              onTemplateFilterChange={setActiveTemplateFilter}
+              templates={templates}
               bulkMode={bulkMode}
               onBulkToggle={() => {
                 setBulkMode(!bulkMode);

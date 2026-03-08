@@ -1,5 +1,6 @@
 import { Play } from "lucide-react";
 import StarRating from "./StarRating";
+import VideoPlayer from "./VideoPlayer";
 
 export interface Answer {
   id: string;
@@ -12,9 +13,11 @@ interface Props {
   answer: Answer;
   index: number;
   onRate: (answerId: string, rating: number) => void;
+  playbackRate?: number;
+  onPlaybackRateChange?: (rate: number) => void;
 }
 
-export default function AnswerCard({ answer, index, onRate }: Props) {
+export default function AnswerCard({ answer, index, onRate, playbackRate, onPlaybackRateChange }: Props) {
   return (
     <div className="rounded-lg bg-secondary/50 p-4 space-y-3">
       <div className="flex items-center justify-between">
@@ -29,10 +32,10 @@ export default function AnswerCard({ answer, index, onRate }: Props) {
         />
       </div>
       {answer.video_url ? (
-        <video
+        <VideoPlayer
           src={answer.video_url}
-          controls
-          className="w-full rounded-lg bg-background"
+          playbackRate={playbackRate}
+          onPlaybackRateChange={onPlaybackRateChange}
         />
       ) : (
         <div className="flex items-center justify-center h-32 rounded-lg bg-background border border-border/50">
