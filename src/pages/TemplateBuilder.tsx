@@ -49,6 +49,8 @@ export default function TemplateBuilder() {
       setTitle(template.title);
       setDescription(template.description || "");
       setIsActive(template.is_active);
+      setRetakesAllowed(template.retakes_allowed ?? 1);
+      setRedirectUrl(template.redirect_url || "");
     }
 
     const { data: qs } = await supabase
