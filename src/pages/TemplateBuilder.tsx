@@ -112,7 +112,7 @@ export default function TemplateBuilder() {
       } else {
         const { error } = await supabase
           .from("interview_templates")
-          .update({ title, description, is_active: isActive })
+          .update({ title, description, is_active: isActive, retakes_allowed: retakesAllowed, redirect_url: redirectUrl || null })
           .eq("id", id!);
         if (error) throw error;
       }
