@@ -138,11 +138,11 @@ export default function TemplatesList() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="font-display text-3xl font-bold">Templates</h1>
+            <h1 className="font-display text-3xl font-bold">Interviews</h1>
             <p className="mt-1 text-muted-foreground">Manage your interview templates</p>
           </div>
           <Link to="/admin/templates/new" className="glow-button flex items-center gap-2 text-sm">
-            <Plus className="h-4 w-4" /> New Template
+            <Plus className="h-4 w-4" /> New Interview
           </Link>
         </div>
 
@@ -227,7 +227,9 @@ export default function TemplatesList() {
                   className="glass-card-hover gradient-border p-6"
                 >
                   <div className="flex items-start justify-between mb-2">
-                    <h3 className="font-display font-semibold text-lg leading-tight">{template.title}</h3>
+                    <Link to={`/admin/submissions?template=${template.id}`} className="font-display font-semibold text-lg leading-tight hover:text-primary transition-colors cursor-pointer">
+                      {template.title}
+                    </Link>
                     <div className="flex items-center gap-1.5 shrink-0">
                       {isExpired && (
                         <span className="rounded-full bg-destructive/20 text-destructive px-2 py-0.5 text-xs font-medium">Expired</span>

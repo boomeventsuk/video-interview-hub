@@ -25,7 +25,7 @@ import {
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
-  { icon: FileText, label: "Templates", path: "/admin/templates" },
+  { icon: FileText, label: "Interviews", path: "/admin/templates" },
   { icon: Users, label: "Submissions", path: "/admin/submissions" },
   { icon: BarChart3, label: "Analytics", path: "/admin/analytics" },
   { icon: UsersRound, label: "Team", path: "/admin/team" },
