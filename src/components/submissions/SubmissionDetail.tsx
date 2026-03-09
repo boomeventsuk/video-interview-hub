@@ -131,6 +131,9 @@ export default function SubmissionDetail({
         </div>
       </div>
 
+      {/* AI Evaluation */}
+      <AIEvaluation submissionId={submission.id} />
+
       {/* Reviewer Notes */}
       <div>
         <button
