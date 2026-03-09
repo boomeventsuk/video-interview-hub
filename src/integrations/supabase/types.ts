@@ -62,6 +62,83 @@ export type Database = {
         }
         Relationships: []
       }
+      org_members: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          invite_token: string | null
+          invited_at: string
+          is_active: boolean
+          joined_at: string | null
+          org_id: string
+          role: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          invite_token?: string | null
+          invited_at?: string
+          is_active?: boolean
+          joined_at?: string | null
+          org_id: string
+          role?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          invite_token?: string | null
+          invited_at?: string
+          is_active?: boolean
+          joined_at?: string | null
+          org_id?: string
+          role?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "org_members_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organisations: {
+        Row: {
+          branding_config: Json | null
+          created_at: string
+          id: string
+          name: string
+          timezone: string | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          branding_config?: Json | null
+          created_at?: string
+          id?: string
+          name?: string
+          timezone?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          branding_config?: Json | null
+          created_at?: string
+          id?: string
+          name?: string
+          timezone?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -132,6 +209,76 @@ export type Database = {
             columns: ["template_id"]
             isOneToOne: false
             referencedRelation: "interview_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ratings: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          star_rating: number
+          submission_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          star_rating: number
+          submission_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          star_rating?: number
+          submission_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ratings_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      share_links: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          submission_id: string
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          submission_id: string
+          token?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          submission_id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "share_links_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "submissions"
             referencedColumns: ["id"]
           },
         ]
