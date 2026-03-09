@@ -563,6 +563,22 @@ export default function TemplateBuilder() {
         }}
         title={recordingQuestionId === "__intro__" ? "Record Intro Video" : "Record Question Video Prompt"}
       />
+      {!isNew && id && (
+        <>
+          <InviteCandidateDialog
+            open={inviteOpen}
+            onOpenChange={setInviteOpen}
+            templateId={id}
+            templateTitle={title}
+          />
+          <BulkInviteDialog
+            open={bulkInviteOpen}
+            onOpenChange={setBulkInviteOpen}
+            templateId={id}
+            templateTitle={title}
+          />
+        </>
+      )}
     </AdminLayout>
   );
 }
