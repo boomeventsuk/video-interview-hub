@@ -24,25 +24,27 @@ export default function InviteCandidateDialog({
   deadline,
   onInvited,
 }: Props) {
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
   const [sending, setSending] = useState(false);
 
   const handleInvite = async () => {
-    if (!name.trim() || !email.trim()) {
-      toast.error("Please enter name and email");
+    if (!firstName.trim() || !lastName.trim() || !email.trim()) {
+      toast.error("Please fill in all fields");
       return;
     }
     setSending(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      const fullName = `${firstName.trim()} ${lastName.trim()}`;
 
       // Create submission with invited status
       const { data: sub, error } = await supabase
         .from("submissions")
         .insert({
           template_id: templateId,
-          applicant_name: name,
+          applicant_name: fullName,
           applicant_email: email,
           status: "invited",
           invited_by: user?.id,
@@ -58,10 +60,10 @@ export default function InviteCandidateDialog({
 
       await sendEmail({
         to: email,
-        toName: name,
-        subject: `You're invited to interview for ${templateTitle}`,
+        toName: fullName,
+        subject: `You're invited to interview — ${templateTitle}`,
         html: buildInviteEmailHtml({
-          candidateName: name,
+          candidateName: firstName.trim(),
           templateTitle,
           interviewUrl,
           deadline,
@@ -72,7 +74,8 @@ export default function InviteCandidateDialog({
       });
 
       toast.success(`Invitation sent to ${email}`);
-      setName("");
+      setFirstName("");
+      setLastName("");
       setEmail("");
       onOpenChange(false);
       onInvited?.();
@@ -93,14 +96,25 @@ export default function InviteCandidateDialog({
           <p className="text-sm text-muted-foreground">
             Send an interview invitation for <strong>{templateTitle}</strong>
           </p>
-          <div className="space-y-2">
-            <Label>Candidate Name</Label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Jane Smith"
-              className="bg-secondary/50 border-border/50"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>First Name</Label>
+              <Input
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                placeholder="Jane"
+                className="bg-secondary/50 border-border/50"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Last Name</Label>
+              <Input
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                placeholder="Smith"
+                className="bg-secondary/50 border-border/50"
+              />
+            </div>
           </div>
           <div className="space-y-2">
             <Label>Email Address</Label>

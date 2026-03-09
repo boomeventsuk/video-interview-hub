@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Upload, Check, X, AlertCircle } from "lucide-react";
+import { Upload, Check, X, AlertCircle, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { sendEmail, buildInviteEmailHtml } from "@/lib/email";
 import { toast } from "sonner";
@@ -16,7 +16,8 @@ interface Props {
 }
 
 interface CsvRow {
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   valid: boolean;
 }
@@ -35,21 +36,52 @@ export default function BulkInviteDialog({
   const [progress, setProgress] = useState({ sent: 0, failed: 0, total: 0 });
   const [done, setDone] = useState(false);
 
+  const downloadTemplate = () => {
+    const csv = "first_name,last_name,email\nJane,Smith,jane@example.com\nJohn,Doe,john@example.com\n";
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "invite-template.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const parseCsv = (text: string): CsvRow[] => {
     const lines = text.trim().split("\n").map((l) => l.trim()).filter(Boolean);
     const result: CsvRow[] = [];
 
     for (const line of lines) {
       const parts = line.split(",").map((p) => p.trim().replace(/^"|"$/g, ""));
-      if (parts.length < 2) continue;
+      if (parts.length < 3) {
+        // Try 2-col format: "name,email" for backwards compat
+        if (parts.length === 2) {
+          const lower0 = parts[0].toLowerCase();
+          const lower1 = parts[1].toLowerCase();
+          if ((lower0 === "name" || lower0 === "first_name") && (lower1 === "email" || lower1 === "last_name")) continue;
+          const nameParts = parts[0].split(" ");
+          const firstName = nameParts[0] || "";
+          const lastName = nameParts.slice(1).join(" ") || "";
+          const email = parts[1];
+          const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && firstName.length > 0;
+          result.push({ firstName, lastName, email, valid });
+        }
+        continue;
+      }
 
       // Skip header row
-      if (parts[0].toLowerCase() === "name" && parts[1].toLowerCase() === "email") continue;
+      const h0 = parts[0].toLowerCase();
+      const h1 = parts[1].toLowerCase();
+      const h2 = parts[2].toLowerCase();
+      if ((h0 === "first_name" || h0 === "firstname" || h0 === "first name" || h0 === "name") &&
+          (h1 === "last_name" || h1 === "lastname" || h1 === "last name" || h1 === "surname") &&
+          (h2 === "email" || h2 === "email address")) continue;
 
-      const name = parts[0];
-      const email = parts[1];
-      const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && name.length > 0;
-      result.push({ name, email, valid });
+      const firstName = parts[0];
+      const lastName = parts[1];
+      const email = parts[2];
+      const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && firstName.length > 0;
+      result.push({ firstName, lastName, email, valid });
     }
     return result;
   };
@@ -57,7 +89,6 @@ export default function BulkInviteDialog({
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
@@ -81,11 +112,12 @@ export default function BulkInviteDialog({
 
     for (const row of validRows) {
       try {
+        const fullName = `${row.firstName} ${row.lastName}`.trim();
         const { data: sub, error } = await supabase
           .from("submissions")
           .insert({
             template_id: templateId,
-            applicant_name: row.name,
+            applicant_name: fullName,
             applicant_email: row.email,
             status: "invited",
             invited_by: user?.id,
@@ -100,10 +132,10 @@ export default function BulkInviteDialog({
 
         await sendEmail({
           to: row.email,
-          toName: row.name,
-          subject: `You're invited to interview for ${templateTitle}`,
+          toName: fullName,
+          subject: `You're invited to interview — ${templateTitle}`,
           html: buildInviteEmailHtml({
-            candidateName: row.name,
+            candidateName: row.firstName,
             templateTitle,
             interviewUrl,
             deadline,
@@ -137,13 +169,16 @@ export default function BulkInviteDialog({
         </DialogHeader>
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Upload a CSV file with <code className="text-xs bg-secondary px-1 py-0.5 rounded">name,email</code> columns to send invitations for <strong>{templateTitle}</strong>.
+            Upload a CSV with <code className="text-xs bg-secondary px-1 py-0.5 rounded">first_name, last_name, email</code> columns for <strong>{templateTitle}</strong>.
           </p>
 
-          <div>
+          <div className="flex items-center gap-2">
             <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFile} />
             <Button variant="outline" onClick={() => fileRef.current?.click()}>
               <Upload className="h-4 w-4 mr-2" /> Upload CSV
+            </Button>
+            <Button variant="ghost" size="sm" onClick={downloadTemplate}>
+              <Download className="h-4 w-4 mr-2" /> Download Template
             </Button>
           </div>
 
@@ -168,7 +203,7 @@ export default function BulkInviteDialog({
                       row.valid ? "bg-secondary/50" : "bg-destructive/10"
                     }`}
                   >
-                    <span>{row.name}</span>
+                    <span>{row.firstName} {row.lastName}</span>
                     <span className="text-muted-foreground">{row.email}</span>
                     {!row.valid && <AlertCircle className="h-3 w-3 text-destructive shrink-0" />}
                   </div>
