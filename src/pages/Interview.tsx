@@ -97,6 +97,20 @@ export default function Interview() {
   const mimeInfoRef = useRef<ReturnType<typeof getSupportedMimeType>>(null);
   const pendingBlobRef = useRef<{ blob: Blob; ext: string } | null>(null);
 
+  // Re-attach stream to video element whenever stage changes (AnimatePresence remounts the video element)
+  useEffect(() => {
+    if ((stage === "prep" || stage === "recording") && streamRef.current && videoRef.current) {
+      // Small delay to ensure the new video element from AnimatePresence is mounted
+      const timeout = setTimeout(() => {
+        if (videoRef.current && streamRef.current) {
+          videoRef.current.srcObject = streamRef.current;
+          videoRef.current.play().catch(() => {});
+        }
+      }, 50);
+      return () => clearTimeout(timeout);
+    }
+  }, [stage, currentQ]);
+
   // Camera disconnect detection
   useEffect(() => {
     const stream = streamRef.current;
