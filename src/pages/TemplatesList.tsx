@@ -142,7 +142,7 @@ export default function TemplatesList() {
             <p className="mt-1 text-muted-foreground">Manage your interview templates</p>
           </div>
           <Link to="/admin/templates/new" className="glow-button flex items-center gap-2 text-sm">
-            <Plus className="h-4 w-4" /> New Template
+            <Plus className="h-4 w-4" /> New Interview
           </Link>
         </div>
 
