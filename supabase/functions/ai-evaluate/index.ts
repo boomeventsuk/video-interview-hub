@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,36 +7,11 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB per video
-
 function getMimeType(url: string): string {
   if (url.endsWith(".mp4")) return "video/mp4";
   if (url.endsWith(".webm")) return "video/webm";
   if (url.endsWith(".3gp") || url.endsWith(".3gpp")) return "video/3gpp";
-  return "video/webm"; // default
-}
-
-async function downloadAndEncodeVideo(url: string): Promise<{ dataUri: string; mimeType: string } | null> {
-  try {
-    const resp = await fetch(url);
-    if (!resp.ok) {
-      console.error(`Failed to download video: ${resp.status} ${url}`);
-      return null;
-    }
-
-    const buffer = await resp.arrayBuffer();
-    if (buffer.byteLength > MAX_VIDEO_SIZE) {
-      console.warn(`Video too large (${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB), skipping: ${url}`);
-      return null;
-    }
-
-    const mimeType = getMimeType(url);
-    const b64 = base64Encode(new Uint8Array(buffer));
-    return { dataUri: `data:${mimeType};base64,${b64}`, mimeType };
-  } catch (e) {
-    console.error(`Error downloading video: ${e}`);
-    return null;
-  }
+  return "video/webm";
 }
 
 serve(async (req) => {
@@ -82,46 +56,33 @@ serve(async (req) => {
     const template = (submission as any).interview_templates;
     const candidateName = (submission as any).applicant_name;
 
-    // Build multimodal content parts
+    // Build multimodal content parts — use URLs directly (no downloading)
     const contentParts: any[] = [];
 
-    // Opening context
     contentParts.push({
       type: "text",
       text: `Candidate: ${candidateName}\nInterview: ${template?.title || "Unknown"}\n${template?.department ? `Department: ${template.department}\n` : ""}${template?.description ? `Role description: ${template.description}\n` : ""}\nTotal questions: ${answers.length}\nQuestions answered: ${answers.filter((a: any) => !!a.video_url).length}\nQuestions skipped: ${answers.filter((a: any) => !a.video_url).length}\n`,
     });
 
-    // Process each answer: download video + add as multimodal content
     for (let i = 0; i < answers.length; i++) {
       const a = answers[i] as any;
       const q = a.questions;
 
-      // Add question text
       contentParts.push({
         type: "text",
         text: `\n--- Question ${i + 1} of ${answers.length} ---\n"${q?.question_text || "Unknown"}"${q?.description ? ` (Context: ${q.description})` : ""}`,
       });
 
       if (a.video_url) {
-        console.log(`Downloading video ${i + 1}: ${a.video_url}`);
-        const videoData = await downloadAndEncodeVideo(a.video_url);
-
-        if (videoData) {
-          console.log(`Video ${i + 1} encoded successfully (${videoData.mimeType})`);
-          contentParts.push({
-            type: "image_url",
-            image_url: { url: videoData.dataUri },
-          });
-          contentParts.push({
-            type: "text",
-            text: `[Video response above for Question ${i + 1}]`,
-          });
-        } else {
-          contentParts.push({
-            type: "text",
-            text: `[Video provided but could not be loaded for analysis — it may be too large (>15MB) or unavailable]`,
-          });
-        }
+        console.log(`Including video ${i + 1} via URL: ${a.video_url}`);
+        contentParts.push({
+          type: "image_url",
+          image_url: { url: a.video_url },
+        });
+        contentParts.push({
+          type: "text",
+          text: `[Video response above for Question ${i + 1}]`,
+        });
       } else {
         contentParts.push({
           type: "text",
@@ -152,7 +113,7 @@ Be specific in your evaluation — reference what you observed in the videos. No
 
 You MUST call the suggest_evaluation function with your assessment.`;
 
-    console.log(`Sending AI request with ${contentParts.length} content parts (including video data)`);
+    console.log(`Sending AI request with ${contentParts.length} content parts (video URLs, not base64)`);
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -230,7 +191,6 @@ You MUST call the suggest_evaluation function with your assessment.`;
     const aiData = await aiResponse.json();
     console.log("AI response choices:", JSON.stringify(aiData.choices?.[0]?.message, null, 2));
 
-    // Extract evaluation from tool calls first, then fallback to content parsing
     let evaluation: any = null;
 
     const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
@@ -260,7 +220,6 @@ You MUST call the suggest_evaluation function with your assessment.`;
       throw new Error("No evaluation returned from AI");
     }
 
-    // Validate and normalize
     const normalizedEval = {
       overall_score: Math.min(10, Math.max(1, evaluation.overall_score || 5)),
       summary: evaluation.summary || "Evaluation completed.",
@@ -271,7 +230,6 @@ You MUST call the suggest_evaluation function with your assessment.`;
         : "consider",
     };
 
-    // Store evaluation
     const { error: insertErr } = await supabase.from("ai_evaluations").insert({
       submission_id,
       overall_score: normalizedEval.overall_score,
