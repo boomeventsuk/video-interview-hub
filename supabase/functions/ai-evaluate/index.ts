@@ -7,6 +7,174 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const MAX_VIDEO_SIZE = 15 * 1024 * 1024; // 15MB limit per video
+const AI_GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const MODEL = "google/gemini-2.5-flash";
+
+interface PerQuestionResult {
+  questionIndex: number;
+  questionText: string;
+  score: number;
+  notes: string;
+  hadVideo: boolean;
+  videoSkippedReason?: string;
+}
+
+function parseToolCall(aiData: any): any {
+  const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+  if (toolCall?.function?.arguments) {
+    try { return JSON.parse(toolCall.function.arguments); } catch {}
+  }
+  const content = aiData.choices?.[0]?.message?.content;
+  if (content) {
+    try {
+      const m = content.match(/\{[\s\S]*\}/);
+      if (m) return JSON.parse(m[0]);
+    } catch {}
+  }
+  return null;
+}
+
+async function callAI(apiKey: string, body: any): Promise<any> {
+  const resp = await fetch(AI_GATEWAY, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) {
+    const txt = await resp.text();
+    console.error("AI gateway error:", resp.status, txt);
+    throw Object.assign(new Error(`AI gateway ${resp.status}`), { status: resp.status, body: txt });
+  }
+  return resp.json();
+}
+
+async function evaluateSingleQuestion(
+  apiKey: string,
+  answer: any,
+  questionIndex: number,
+  totalQuestions: number,
+  template: any,
+): Promise<PerQuestionResult> {
+  const q = answer.questions;
+  const questionText = q?.question_text || "Unknown question";
+  const result: PerQuestionResult = {
+    questionIndex,
+    questionText,
+    score: 0,
+    notes: "",
+    hadVideo: !!answer.video_url,
+  };
+
+  if (!answer.video_url) {
+    result.score = 2;
+    result.notes = "Candidate skipped this question — no video submitted.";
+    return result;
+  }
+
+  // Try to download the video for multimodal analysis
+  let videoBase64: string | null = null;
+  let mimeType = "video/webm";
+  try {
+    console.log(`Downloading video for Q${questionIndex + 1}...`);
+    const videoResp = await fetch(answer.video_url);
+    if (!videoResp.ok) throw new Error(`HTTP ${videoResp.status}`);
+    
+    const contentType = videoResp.headers.get("content-type");
+    if (contentType?.includes("mp4")) mimeType = "video/mp4";
+    
+    const videoBytes = await videoResp.arrayBuffer();
+    console.log(`Video Q${questionIndex + 1}: ${(videoBytes.byteLength / 1024 / 1024).toFixed(1)}MB`);
+    
+    if (videoBytes.byteLength > MAX_VIDEO_SIZE) {
+      result.videoSkippedReason = `Video too large (${(videoBytes.byteLength / 1024 / 1024).toFixed(0)}MB > 15MB limit)`;
+      console.log(result.videoSkippedReason);
+    } else {
+      // Encode to base64
+      const bytes = new Uint8Array(videoBytes);
+      let binary = "";
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      videoBase64 = btoa(binary);
+      console.log(`Video Q${questionIndex + 1} encoded to base64 (${(videoBase64.length / 1024 / 1024).toFixed(1)}MB)`);
+    }
+  } catch (e) {
+    result.videoSkippedReason = `Failed to download video: ${e instanceof Error ? e.message : "unknown"}`;
+    console.error(`Video download failed for Q${questionIndex + 1}:`, e);
+  }
+
+  // Build the AI request
+  const systemPrompt = `You are an expert interviewer evaluating a candidate's video response for the role "${template?.title || "Unknown"}". Question ${questionIndex + 1} of ${totalQuestions}.
+
+Evaluate the candidate's response on:
+- Communication clarity and confidence
+- Relevance and depth of answer
+- Body language and presentation (if video visible)
+- Overall quality
+
+You MUST call the evaluate_answer function with your assessment.`;
+
+  const userContent: any[] = [];
+  
+  if (videoBase64) {
+    // Send video as multimodal content
+    userContent.push({
+      type: "image_url",
+      image_url: { url: `data:${mimeType};base64,${videoBase64}` },
+    });
+  }
+
+  let textPrompt = `Question: "${questionText}"`;
+  if (q?.description) textPrompt += `\nContext: ${q.description}`;
+  if (result.videoSkippedReason) {
+    textPrompt += `\n\n[Note: Video could not be analyzed: ${result.videoSkippedReason}. Evaluate based on the fact that the candidate did submit a response.]`;
+  } else if (videoBase64) {
+    textPrompt += `\n\nPlease watch the video response above and evaluate the candidate's answer.`;
+  }
+  userContent.push({ type: "text", text: textPrompt });
+
+  const aiData = await callAI(apiKey, {
+    model: MODEL,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userContent },
+    ],
+    tools: [{
+      type: "function",
+      function: {
+        name: "evaluate_answer",
+        description: "Submit evaluation of a single answer",
+        parameters: {
+          type: "object",
+          properties: {
+            score: { type: "integer", description: "Score 1-10" },
+            notes: { type: "string", description: "2-3 sentence assessment of this answer" },
+          },
+          required: ["score", "notes"],
+          additionalProperties: false,
+        },
+      },
+    }],
+    tool_choice: { type: "function", function: { name: "evaluate_answer" } },
+  });
+
+  // Free the base64 string from memory immediately
+  videoBase64 = null;
+
+  const parsed = parseToolCall(aiData);
+  if (parsed) {
+    result.score = Math.min(10, Math.max(1, parsed.score || 5));
+    result.notes = parsed.notes || "Evaluation completed.";
+  } else {
+    console.error(`No evaluation parsed for Q${questionIndex + 1}:`, JSON.stringify(aiData));
+    result.score = 5;
+    result.notes = "AI evaluation could not be parsed for this question.";
+  }
+
+  return result;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -49,149 +217,94 @@ serve(async (req) => {
     const template = (submission as any).interview_templates;
     const candidateName = (submission as any).applicant_name;
 
-    // Build text-based prompt with all interview context
-    let prompt = `Candidate: ${candidateName}\nInterview: ${template?.title || "Unknown"}\n`;
-    if (template?.department) prompt += `Department: ${template.department}\n`;
-    if (template?.description) prompt += `Role description: ${template.description}\n`;
-    prompt += `Total questions: ${answers.length}\n`;
-    prompt += `Questions answered: ${answers.filter((a: any) => !!a.video_url).length}\n`;
-    prompt += `Questions skipped: ${answers.filter((a: any) => !a.video_url).length}\n\n`;
+    console.log(`Starting sequential AI evaluation for submission ${submission_id} (${answers.length} questions)`);
 
+    // Phase 1: Evaluate each question individually (sequential to manage memory)
+    const perQuestionResults: PerQuestionResult[] = [];
     for (let i = 0; i < answers.length; i++) {
       const a = answers[i] as any;
-      const q = a.questions;
-      prompt += `--- Question ${i + 1} of ${answers.length} ---\n`;
-      prompt += `"${q?.question_text || "Unknown"}"`;
-      if (q?.description) prompt += ` (Context: ${q.description})`;
-      prompt += "\n";
-
-      if (a.video_url) {
-        prompt += `[Video response submitted]\n`;
-      } else {
-        prompt += `[SKIPPED — No recording submitted]\n`;
+      console.log(`Evaluating Q${i + 1}/${answers.length}...`);
+      try {
+        const result = await evaluateSingleQuestion(
+          LOVABLE_API_KEY, a, i, answers.length, template
+        );
+        perQuestionResults.push(result);
+        console.log(`Q${i + 1} score: ${result.score}/10`);
+      } catch (e: any) {
+        console.error(`Error evaluating Q${i + 1}:`, e);
+        if (e.status === 429 || e.status === 402) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: e.status === 429 ? "Rate limited, please try again later" : "AI credits exhausted, please top up",
+          }), { status: e.status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        perQuestionResults.push({
+          questionIndex: i,
+          questionText: a.questions?.question_text || "Unknown",
+          score: 5,
+          notes: "Could not evaluate this question due to an error.",
+          hadVideo: !!a.video_url,
+        });
       }
-      prompt += "\n";
     }
 
-    const systemPrompt = `You are an expert hiring evaluator for ${template?.title || "a role"}${template?.department ? ` in the ${template.department} department` : ""}. 
+    // Phase 2: Aggregate into final evaluation via a text-only synthesis call
+    console.log("Synthesizing overall evaluation...");
+    let synthesisPrompt = `Candidate: ${candidateName}\nRole: ${template?.title || "Unknown"}`;
+    if (template?.department) synthesisPrompt += ` (${template.department})`;
+    if (template?.description) synthesisPrompt += `\nRole description: ${template.description}`;
+    synthesisPrompt += `\n\nPer-question evaluation results:\n\n`;
 
-You are evaluating a candidate's interview submission based on the questions asked and whether they were answered or skipped. Since you cannot watch the video responses directly, evaluate based on:
+    for (const r of perQuestionResults) {
+      synthesisPrompt += `Q${r.questionIndex + 1}: "${r.questionText}"\n`;
+      synthesisPrompt += `  Score: ${r.score}/10 | Video: ${r.hadVideo ? "Yes" : "Skipped"}`;
+      if (r.videoSkippedReason) synthesisPrompt += ` (${r.videoSkippedReason})`;
+      synthesisPrompt += `\n  Notes: ${r.notes}\n\n`;
+    }
 
-- **Completion rate**: How many questions were answered vs skipped
-- **Question relevance**: Whether the questions asked align with assessing the candidate for this role
-- **Red flags**: Skipped questions, especially required or critical ones
-- **Overall engagement**: Did the candidate complete the full interview?
+    const avgScore = perQuestionResults.reduce((s, r) => s + r.score, 0) / perQuestionResults.length;
+    synthesisPrompt += `Average per-question score: ${avgScore.toFixed(1)}/10\n`;
+    synthesisPrompt += `Questions answered: ${perQuestionResults.filter(r => r.hadVideo).length}/${perQuestionResults.length}`;
 
-${template?.description ? `Role description: ${template.description}` : ""}
+    const synthesisSystem = `You are synthesizing per-question interview evaluations into an overall candidate assessment. The individual questions have already been evaluated (with video analysis where possible). Combine these results into a cohesive overall evaluation.
 
-Provide a fair preliminary assessment. Note that this is a text-based analysis — video review by a human reviewer is recommended for final decisions.
+You MUST call the suggest_evaluation function with your final assessment.`;
 
-You MUST call the suggest_evaluation function with your assessment.`;
-
-    console.log(`Sending text-based AI evaluation request for submission ${submission_id}`);
-
-    const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: prompt },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "suggest_evaluation",
-              description: "Submit a structured evaluation of the candidate based on their interview submission",
-              parameters: {
-                type: "object",
-                properties: {
-                  overall_score: {
-                    type: "integer",
-                    description: "Score from 1-10 (1=poor, 10=exceptional)",
-                  },
-                  summary: {
-                    type: "string",
-                    description: "2-3 sentence overview of the candidate's submission",
-                  },
-                  strengths: {
-                    type: "array",
-                    items: { type: "string" },
-                    description: "2-4 key strengths observed",
-                  },
-                  concerns: {
-                    type: "array",
-                    items: { type: "string" },
-                    description: "1-3 concerns or areas to probe further",
-                  },
-                  recommendation: {
-                    type: "string",
-                    enum: ["strongly_recommend", "recommend", "consider", "do_not_recommend"],
-                    description: "Hiring recommendation",
-                  },
-                },
-                required: ["overall_score", "summary", "strengths", "concerns", "recommendation"],
-                additionalProperties: false,
+    const synthesisData = await callAI(LOVABLE_API_KEY, {
+      model: MODEL,
+      messages: [
+        { role: "system", content: synthesisSystem },
+        { role: "user", content: synthesisPrompt },
+      ],
+      tools: [{
+        type: "function",
+        function: {
+          name: "suggest_evaluation",
+          description: "Submit overall candidate evaluation",
+          parameters: {
+            type: "object",
+            properties: {
+              overall_score: { type: "integer", description: "Score from 1-10" },
+              summary: { type: "string", description: "2-3 sentence overview" },
+              strengths: { type: "array", items: { type: "string" }, description: "2-4 key strengths" },
+              concerns: { type: "array", items: { type: "string" }, description: "1-3 concerns" },
+              recommendation: {
+                type: "string",
+                enum: ["strongly_recommend", "recommend", "consider", "do_not_recommend"],
               },
             },
+            required: ["overall_score", "summary", "strengths", "concerns", "recommendation"],
+            additionalProperties: false,
           },
-        ],
-        tool_choice: { type: "function", function: { name: "suggest_evaluation" } },
-      }),
+        },
+      }],
+      tool_choice: { type: "function", function: { name: "suggest_evaluation" } },
     });
 
-    if (!aiResponse.ok) {
-      const errText = await aiResponse.text();
-      console.error("AI gateway error:", aiResponse.status, errText);
-      if (aiResponse.status === 429) {
-        return new Response(JSON.stringify({ success: false, error: "Rate limited, please try again later" }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (aiResponse.status === 402) {
-        return new Response(JSON.stringify({ success: false, error: "AI credits exhausted, please top up" }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      throw new Error(`AI gateway error: ${aiResponse.status} - ${errText}`);
-    }
-
-    const aiData = await aiResponse.json();
-    console.log("AI response received successfully");
-
-    let evaluation: any = null;
-
-    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-    if (toolCall?.function?.arguments) {
-      try {
-        evaluation = JSON.parse(toolCall.function.arguments);
-      } catch (e) {
-        console.error("Failed to parse tool call arguments:", e);
-      }
-    }
-
+    const evaluation = parseToolCall(synthesisData);
     if (!evaluation) {
-      const content = aiData.choices?.[0]?.message?.content;
-      if (content) {
-        try {
-          const jsonMatch = content.match(/\{[\s\S]*\}/);
-          if (jsonMatch) evaluation = JSON.parse(jsonMatch[0]);
-        } catch (e) {
-          console.error("Failed to parse content as JSON:", e);
-        }
-      }
-    }
-
-    if (!evaluation) {
-      console.error("Full AI response:", JSON.stringify(aiData, null, 2));
-      throw new Error("No evaluation returned from AI");
+      console.error("Synthesis response:", JSON.stringify(synthesisData, null, 2));
+      throw new Error("No evaluation returned from AI synthesis");
     }
 
     const normalizedEval = {
@@ -211,7 +324,7 @@ You MUST call the suggest_evaluation function with your assessment.`;
       strengths: normalizedEval.strengths,
       concerns: normalizedEval.concerns,
       recommendation: normalizedEval.recommendation,
-      raw_response: aiData,
+      raw_response: { per_question: perQuestionResults, synthesis: synthesisData },
     });
 
     if (insertErr) {
@@ -219,11 +332,18 @@ You MUST call the suggest_evaluation function with your assessment.`;
       throw new Error("Failed to save evaluation");
     }
 
+    console.log(`Evaluation complete: ${normalizedEval.overall_score}/10 - ${normalizedEval.recommendation}`);
     return new Response(JSON.stringify({ success: true, evaluation: normalizedEval }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (e) {
+  } catch (e: any) {
     console.error("ai-evaluate error:", e);
+    if (e.status === 429 || e.status === 402) {
+      return new Response(JSON.stringify({ error: e.status === 429 ? "Rate limited" : "Credits exhausted" }), {
+        status: e.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
