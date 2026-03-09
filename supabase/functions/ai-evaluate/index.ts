@@ -8,7 +8,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const MAX_VIDEO_SIZE = 15 * 1024 * 1024; // 15MB per video
+const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB per video
 
 function getMimeType(url: string): string {
   if (url.endsWith(".mp4")) return "video/mp4";
