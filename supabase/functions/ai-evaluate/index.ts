@@ -1,11 +1,44 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
+
+const MAX_VIDEO_SIZE = 15 * 1024 * 1024; // 15MB per video
+
+function getMimeType(url: string): string {
+  if (url.endsWith(".mp4")) return "video/mp4";
+  if (url.endsWith(".webm")) return "video/webm";
+  if (url.endsWith(".3gp") || url.endsWith(".3gpp")) return "video/3gpp";
+  return "video/webm"; // default
+}
+
+async function downloadAndEncodeVideo(url: string): Promise<{ dataUri: string; mimeType: string } | null> {
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      console.error(`Failed to download video: ${resp.status} ${url}`);
+      return null;
+    }
+
+    const buffer = await resp.arrayBuffer();
+    if (buffer.byteLength > MAX_VIDEO_SIZE) {
+      console.warn(`Video too large (${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB), skipping: ${url}`);
+      return null;
+    }
+
+    const mimeType = getMimeType(url);
+    const b64 = base64Encode(new Uint8Array(buffer));
+    return { dataUri: `data:${mimeType};base64,${b64}`, mimeType };
+  } catch (e) {
+    console.error(`Error downloading video: ${e}`);
+    return null;
+  }
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -22,10 +55,7 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, serviceKey);
 
     // Delete any existing evaluation (for re-runs)
-    await supabase
-      .from("ai_evaluations")
-      .delete()
-      .eq("submission_id", submission_id);
+    await supabase.from("ai_evaluations").delete().eq("submission_id", submission_id);
 
     // Load submission
     const { data: submission, error: subErr } = await supabase
@@ -52,50 +82,78 @@ serve(async (req) => {
     const template = (submission as any).interview_templates;
     const candidateName = (submission as any).applicant_name;
 
-    // Build content parts for multimodal analysis
+    // Build multimodal content parts
     const contentParts: any[] = [];
 
-    let textContext = `Candidate: ${candidateName}\nInterview: ${template?.title || "Unknown"}\n${template?.department ? `Department: ${template.department}\n` : ""}`;
-    if (template?.description) {
-      textContext += `Role description: ${template.description}\n`;
-    }
-    textContext += `\nTotal questions: ${answers.length}\nQuestions answered: ${answers.filter((a: any) => !!a.video_url).length}\nQuestions skipped: ${answers.filter((a: any) => !a.video_url).length}\n`;
+    // Opening context
+    contentParts.push({
+      type: "text",
+      text: `Candidate: ${candidateName}\nInterview: ${template?.title || "Unknown"}\n${template?.department ? `Department: ${template.department}\n` : ""}${template?.description ? `Role description: ${template.description}\n` : ""}\nTotal questions: ${answers.length}\nQuestions answered: ${answers.filter((a: any) => !!a.video_url).length}\nQuestions skipped: ${answers.filter((a: any) => !a.video_url).length}\n`,
+    });
 
-    // Add each question and its video
+    // Process each answer: download video + add as multimodal content
     for (let i = 0; i < answers.length; i++) {
       const a = answers[i] as any;
       const q = a.questions;
 
-      textContext += `\n--- Question ${i + 1} of ${answers.length} ---\n"${q?.question_text || "Unknown"}"${q?.description ? ` (Context: ${q.description})` : ""}\n`;
+      // Add question text
+      contentParts.push({
+        type: "text",
+        text: `\n--- Question ${i + 1} of ${answers.length} ---\n"${q?.question_text || "Unknown"}"${q?.description ? ` (Context: ${q.description})` : ""}`,
+      });
 
       if (a.video_url) {
-        textContext += `Video response provided - URL: ${a.video_url}\n`;
+        console.log(`Downloading video ${i + 1}: ${a.video_url}`);
+        const videoData = await downloadAndEncodeVideo(a.video_url);
+
+        if (videoData) {
+          console.log(`Video ${i + 1} encoded successfully (${videoData.mimeType})`);
+          contentParts.push({
+            type: "image_url",
+            image_url: { url: videoData.dataUri },
+          });
+          contentParts.push({
+            type: "text",
+            text: `[Video response above for Question ${i + 1}]`,
+          });
+        } else {
+          contentParts.push({
+            type: "text",
+            text: `[Video provided but could not be loaded for analysis — it may be too large (>15MB) or unavailable]`,
+          });
+        }
       } else {
-        textContext += `[SKIPPED - No recording submitted]\n`;
+        contentParts.push({
+          type: "text",
+          text: `[SKIPPED — No recording submitted for this question]`,
+        });
       }
     }
 
-    textContext += `\nPlease provide a thorough evaluation of this candidate based on the interview questions they were asked and their responses.`;
-
-    contentParts.push({ type: "text", text: textContext });
+    contentParts.push({
+      type: "text",
+      text: `\nPlease carefully watch each video response and provide a thorough evaluation of this candidate.`,
+    });
 
     const systemPrompt = `You are an expert hiring evaluator for ${template?.title || "a role"}${template?.department ? ` in the ${template.department} department` : ""}. 
 
-You are evaluating a candidate's interview submission based on the questions asked and whether they provided responses. Evaluate based on:
-- Communication skills (clarity, confidence, articulation)
-- Relevance and quality of their answers to each question
-- Enthusiasm and engagement
-- Professional presentation
-- How well they address the specific requirements mentioned in each question
-- Overall suitability for the role
+You are evaluating a candidate's video interview submission. You will receive the actual video recordings of the candidate answering each question. Watch each video carefully and evaluate based on:
+
+- **Communication skills**: clarity of speech, articulation, confidence, pace, and fluency
+- **Body language & presentation**: eye contact, posture, professional appearance, energy
+- **Content quality**: relevance, depth, and structure of their answers to each specific question
+- **Enthusiasm & engagement**: genuine interest in the role, passion, and energy
+- **Critical thinking**: ability to think on their feet, provide examples, and reason through questions
+- **Overall suitability**: how well they match the requirements of the role
 
 ${template?.description ? `Role description: ${template.description}` : ""}
 
+Be specific in your evaluation — reference what you observed in the videos. Note any skipped questions as a concern.
+
 You MUST call the suggest_evaluation function with your assessment.`;
 
-    console.log("Sending AI request with", contentParts.length, "content parts");
+    console.log(`Sending AI request with ${contentParts.length} content parts (including video data)`);
 
-    // Call Gemini via Lovable AI gateway
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -113,7 +171,7 @@ You MUST call the suggest_evaluation function with your assessment.`;
             type: "function",
             function: {
               name: "suggest_evaluation",
-              description: "Submit a structured evaluation of the candidate",
+              description: "Submit a structured evaluation of the candidate based on their video responses",
               parameters: {
                 type: "object",
                 properties: {
@@ -123,17 +181,17 @@ You MUST call the suggest_evaluation function with your assessment.`;
                   },
                   summary: {
                     type: "string",
-                    description: "2-3 sentence overview of the candidate's performance",
+                    description: "2-3 sentence overview of the candidate's performance based on what you observed in the videos",
                   },
                   strengths: {
                     type: "array",
                     items: { type: "string" },
-                    description: "2-4 key strengths observed",
+                    description: "2-4 key strengths observed in the video responses",
                   },
                   concerns: {
                     type: "array",
                     items: { type: "string" },
-                    description: "1-3 concerns or areas to probe further",
+                    description: "1-3 concerns or areas to probe further based on the video responses",
                   },
                   recommendation: {
                     type: "string",
@@ -172,7 +230,7 @@ You MUST call the suggest_evaluation function with your assessment.`;
     const aiData = await aiResponse.json();
     console.log("AI response choices:", JSON.stringify(aiData.choices?.[0]?.message, null, 2));
 
-    // Try to get evaluation from tool calls first, then fall back to parsing content
+    // Extract evaluation from tool calls first, then fallback to content parsing
     let evaluation: any = null;
 
     const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
@@ -184,17 +242,13 @@ You MUST call the suggest_evaluation function with your assessment.`;
       }
     }
 
-    // Fallback: try to parse from message content if tool call didn't work
     if (!evaluation) {
       const content = aiData.choices?.[0]?.message?.content;
       if (content) {
         console.log("No tool call found, trying to parse content as JSON");
         try {
-          // Try to find JSON in the content
           const jsonMatch = content.match(/\{[\s\S]*\}/);
-          if (jsonMatch) {
-            evaluation = JSON.parse(jsonMatch[0]);
-          }
+          if (jsonMatch) evaluation = JSON.parse(jsonMatch[0]);
         } catch (e) {
           console.error("Failed to parse content as JSON:", e);
         }
