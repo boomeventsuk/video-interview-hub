@@ -325,6 +325,12 @@ export default function Interview() {
     setTimer(q.recording_duration_seconds);
     setElapsed(0);
 
+    // Re-attach stream to video element (it gets lost when QuestionScreen remounts between stages)
+    if (videoRef.current && streamRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(() => {});
+    }
+
     recorder.start();
 
     clearTimer();
