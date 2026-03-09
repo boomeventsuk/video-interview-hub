@@ -52,38 +52,66 @@ serve(async (req) => {
     const template = (submission as any).interview_templates;
     const candidateName = (submission as any).applicant_name;
 
-    // Build prompt
-    const questionsText = answers
-      .map((a: any, i: number) => {
-        const q = a.questions;
-        const hasVideo = !!a.video_url;
-        return `Question ${i + 1}: "${q?.question_text || "Unknown"}"${q?.description ? ` (Context: ${q.description})` : ""}
-Response: ${hasVideo ? "Video recorded" : "Skipped (no recording)"}`;
-      })
-      .join("\n\n");
+    // Build the user message with video content parts for multimodal analysis
+    const contentParts: any[] = [];
 
+    // Add text context first
     const systemPrompt = `You are an expert hiring evaluator for ${template?.title || "a role"}${template?.department ? ` in the ${template.department} department` : ""}. 
 
-You are evaluating a candidate's video interview submission. You cannot see the videos, but you can see which questions were answered and which were skipped. Evaluate based on:
-- Completion rate (how many questions were answered vs skipped)
-- The quality and relevance of the questions to the role
-- Overall engagement (completing the interview shows commitment)
+You are evaluating a candidate's video interview submission. You will be shown the actual video recordings of their responses. Evaluate based on:
+- Communication skills (clarity, confidence, articulation)
+- Relevance and quality of their answers to each question
+- Enthusiasm and engagement
+- Professional presentation
+- How well they understand and address the specific requirements mentioned in each question
+- Overall suitability for the role
 
 ${template?.description ? `Role description: ${template.description}` : ""}
 
 Provide your evaluation using the suggest_evaluation function.`;
 
-    const userPrompt = `Candidate: ${candidateName}
-Interview: ${template?.title || "Unknown"}
-${template?.department ? `Department: ${template.department}` : ""}
+    let textContext = `Candidate: ${candidateName}\nInterview: ${template?.title || "Unknown"}\n${template?.department ? `Department: ${template.department}\n` : ""}\n`;
 
-${questionsText}
+    // Add each question and its video
+    for (let i = 0; i < answers.length; i++) {
+      const a = answers[i] as any;
+      const q = a.questions;
+      const hasVideo = !!a.video_url;
 
-Total questions: ${answers.length}
-Questions answered: ${answers.filter((a: any) => !!a.video_url).length}
-Questions skipped: ${answers.filter((a: any) => !a.video_url).length}`;
+      textContext += `\n--- Question ${i + 1} of ${answers.length} ---\n"${q?.question_text || "Unknown"}"${q?.description ? ` (Context: ${q.description})` : ""}\n`;
 
-    // Call Gemini via Lovable AI gateway with tool calling for structured output
+      if (hasVideo) {
+        textContext += `[Video response provided below]\n`;
+      } else {
+        textContext += `[SKIPPED - No recording submitted]\n`;
+      }
+    }
+
+    // Add the text context
+    contentParts.push({ type: "text", text: textContext });
+
+    // Add video URLs as content parts for Gemini multimodal processing
+    for (let i = 0; i < answers.length; i++) {
+      const a = answers[i] as any;
+      const q = a.questions;
+      if (a.video_url) {
+        contentParts.push({
+          type: "text",
+          text: `\nVideo response for Question ${i + 1} ("${q?.question_text || "Unknown"}"):`
+        });
+        contentParts.push({
+          type: "image_url",
+          image_url: { url: a.video_url }
+        });
+      }
+    }
+
+    contentParts.push({
+      type: "text",
+      text: `\nTotal questions: ${answers.length}\nQuestions answered: ${answers.filter((a: any) => !!a.video_url).length}\nQuestions skipped: ${answers.filter((a: any) => !a.video_url).length}\n\nPlease watch all videos carefully and provide a thorough evaluation of this candidate.`
+    });
+
+    // Call Gemini Pro via Lovable AI gateway - using Pro for better video understanding
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -91,42 +119,42 @@ Questions skipped: ${answers.filter((a: any) => !a.video_url).length}`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "google/gemini-2.5-pro",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
+          { role: "user", content: contentParts },
         ],
         tools: [
           {
             type: "function",
             function: {
               name: "suggest_evaluation",
-              description: "Submit a structured evaluation of the candidate",
+              description: "Submit a structured evaluation of the candidate based on their video responses",
               parameters: {
                 type: "object",
                 properties: {
                   overall_score: {
                     type: "integer",
-                    description: "Score from 1-10 (1=poor, 10=exceptional)",
+                    description: "Score from 1-10 (1=poor, 10=exceptional) based on video performance",
                   },
                   summary: {
                     type: "string",
-                    description: "2-3 sentence overview of the candidate's performance",
+                    description: "2-3 sentence overview of the candidate's performance based on watching their videos",
                   },
                   strengths: {
                     type: "array",
                     items: { type: "string" },
-                    description: "2-4 key strengths observed",
+                    description: "2-4 key strengths observed from the video responses",
                   },
                   concerns: {
                     type: "array",
                     items: { type: "string" },
-                    description: "1-3 concerns or areas to probe further",
+                    description: "1-3 concerns or areas to probe further based on the video responses",
                   },
                   recommendation: {
                     type: "string",
                     enum: ["strongly_recommend", "recommend", "consider", "do_not_recommend"],
-                    description: "Hiring recommendation",
+                    description: "Hiring recommendation based on video interview performance",
                   },
                 },
                 required: ["overall_score", "summary", "strengths", "concerns", "recommendation"],
