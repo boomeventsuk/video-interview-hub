@@ -249,14 +249,30 @@ export default function TemplateBuilder() {
             </div>
           </div>
           {!isNew && id && (
-            <a
-              href={`/interview/${id}?preview=true`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 rounded-md bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
-            >
-              <Eye className="h-3 w-3" /> Preview
-            </a>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setInviteOpen(true)}
+              >
+                <UserPlus className="h-3.5 w-3.5 mr-1.5" /> Invite
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setBulkInviteOpen(true)}
+              >
+                <Users className="h-3.5 w-3.5 mr-1.5" /> Bulk Invite
+              </Button>
+              <a
+                href={`/interview/${id}?preview=true`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 rounded-md bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
+              >
+                <Eye className="h-3 w-3" /> Preview
+              </a>
+            </div>
           )}
         </div>
 
