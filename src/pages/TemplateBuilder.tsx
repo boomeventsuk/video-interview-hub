@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion, Reorder } from "framer-motion";
-import { Plus, Trash2, GripVertical, Save, ArrowLeft, Clock, Video, CalendarIcon, Eye, X, RotateCcw } from "lucide-react";
+import { Plus, Trash2, GripVertical, Save, ArrowLeft, Clock, Video, CalendarIcon, Eye, X, RotateCcw, UserPlus, Users } from "lucide-react";
 import { format } from "date-fns";
 import AdminLayout from "@/components/AdminLayout";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import VideoRecorderDialog from "@/components/VideoRecorderDialog";
+import InviteCandidateDialog from "@/components/InviteCandidateDialog";
+import BulkInviteDialog from "@/components/BulkInviteDialog";
 
 interface Question {
   id: string;
@@ -46,6 +48,8 @@ export default function TemplateBuilder() {
   const [loading, setLoading] = useState(!isNew);
   const [dbQuestionIds, setDbQuestionIds] = useState<Set<string>>(new Set());
   const [recordingQuestionId, setRecordingQuestionId] = useState<string | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [bulkInviteOpen, setBulkInviteOpen] = useState(false);
 
   useEffect(() => {
     if (!isNew && id) loadTemplate();
@@ -245,14 +249,30 @@ export default function TemplateBuilder() {
             </div>
           </div>
           {!isNew && id && (
-            <a
-              href={`/interview/${id}?preview=true`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 rounded-md bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
-            >
-              <Eye className="h-3 w-3" /> Preview
-            </a>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setInviteOpen(true)}
+              >
+                <UserPlus className="h-3.5 w-3.5 mr-1.5" /> Invite
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setBulkInviteOpen(true)}
+              >
+                <Users className="h-3.5 w-3.5 mr-1.5" /> Bulk Invite
+              </Button>
+              <a
+                href={`/interview/${id}?preview=true`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 rounded-md bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
+              >
+                <Eye className="h-3 w-3" /> Preview
+              </a>
+            </div>
           )}
         </div>
 
@@ -543,6 +563,22 @@ export default function TemplateBuilder() {
         }}
         title={recordingQuestionId === "__intro__" ? "Record Intro Video" : "Record Question Video Prompt"}
       />
+      {!isNew && id && (
+        <>
+          <InviteCandidateDialog
+            open={inviteOpen}
+            onOpenChange={setInviteOpen}
+            templateId={id}
+            templateTitle={title}
+          />
+          <BulkInviteDialog
+            open={bulkInviteOpen}
+            onOpenChange={setBulkInviteOpen}
+            templateId={id}
+            templateTitle={title}
+          />
+        </>
+      )}
     </AdminLayout>
   );
 }
