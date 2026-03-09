@@ -3,6 +3,7 @@ import { ChevronDown, FileDown, StickyNote, Calendar, Share2 } from "lucide-reac
 import { Submission, statusOptions, statusLabels } from "./SubmissionCard";
 import { Answer } from "./AnswerCard";
 import AnswerCard from "./AnswerCard";
+import AIEvaluation from "./AIEvaluation";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
