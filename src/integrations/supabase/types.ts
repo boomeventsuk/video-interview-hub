@@ -331,33 +331,45 @@ export type Database = {
           applicant_name: string
           created_at: string
           id: string
+          invited_at: string | null
+          invited_by: string | null
           overall_rating: number | null
           reviewer_notes: string | null
+          started_at: string | null
           status: string
           template_id: string
           updated_at: string
+          user_agent: string | null
         }
         Insert: {
           applicant_email: string
           applicant_name: string
           created_at?: string
           id?: string
+          invited_at?: string | null
+          invited_by?: string | null
           overall_rating?: number | null
           reviewer_notes?: string | null
+          started_at?: string | null
           status?: string
           template_id: string
           updated_at?: string
+          user_agent?: string | null
         }
         Update: {
           applicant_email?: string
           applicant_name?: string
           created_at?: string
           id?: string
+          invited_at?: string | null
+          invited_by?: string | null
           overall_rating?: number | null
           reviewer_notes?: string | null
+          started_at?: string | null
           status?: string
           template_id?: string
           updated_at?: string
+          user_agent?: string | null
         }
         Relationships: [
           {
