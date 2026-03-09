@@ -79,25 +79,9 @@ serve(async (req) => {
 
     contentParts.push({ type: "text", text: textContext });
 
-    // Add video files as media content parts for Gemini multimodal
-    for (let i = 0; i < answers.length; i++) {
-      const a = answers[i] as any;
-      const q = a.questions;
-      if (a.video_url) {
-        contentParts.push({
-          type: "text",
-          text: `\nVideo for Q${i + 1} ("${q?.question_text || "Unknown"}") follows:`
-        });
-        contentParts.push({
-          type: "image_url",
-          image_url: { url: a.video_url }
-        });
-      }
-    }
-
     const systemPrompt = `You are an expert hiring evaluator for ${template?.title || "a role"}${template?.department ? ` in the ${template.department} department` : ""}. 
 
-You are evaluating a candidate's video interview submission. Evaluate based on:
+You are evaluating a candidate's interview submission based on the questions asked and whether they provided responses. Evaluate based on:
 - Communication skills (clarity, confidence, articulation)
 - Relevance and quality of their answers to each question
 - Enthusiasm and engagement
