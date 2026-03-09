@@ -7,13 +7,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-function getMimeType(url: string): string {
-  if (url.endsWith(".mp4")) return "video/mp4";
-  if (url.endsWith(".webm")) return "video/webm";
-  if (url.endsWith(".3gp") || url.endsWith(".3gpp")) return "video/3gpp";
-  return "video/webm";
-}
-
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -56,64 +49,46 @@ serve(async (req) => {
     const template = (submission as any).interview_templates;
     const candidateName = (submission as any).applicant_name;
 
-    // Build multimodal content parts — use URLs directly (no downloading)
-    const contentParts: any[] = [];
-
-    contentParts.push({
-      type: "text",
-      text: `Candidate: ${candidateName}\nInterview: ${template?.title || "Unknown"}\n${template?.department ? `Department: ${template.department}\n` : ""}${template?.description ? `Role description: ${template.description}\n` : ""}\nTotal questions: ${answers.length}\nQuestions answered: ${answers.filter((a: any) => !!a.video_url).length}\nQuestions skipped: ${answers.filter((a: any) => !a.video_url).length}\n`,
-    });
+    // Build text-based prompt with all interview context
+    let prompt = `Candidate: ${candidateName}\nInterview: ${template?.title || "Unknown"}\n`;
+    if (template?.department) prompt += `Department: ${template.department}\n`;
+    if (template?.description) prompt += `Role description: ${template.description}\n`;
+    prompt += `Total questions: ${answers.length}\n`;
+    prompt += `Questions answered: ${answers.filter((a: any) => !!a.video_url).length}\n`;
+    prompt += `Questions skipped: ${answers.filter((a: any) => !a.video_url).length}\n\n`;
 
     for (let i = 0; i < answers.length; i++) {
       const a = answers[i] as any;
       const q = a.questions;
-
-      contentParts.push({
-        type: "text",
-        text: `\n--- Question ${i + 1} of ${answers.length} ---\n"${q?.question_text || "Unknown"}"${q?.description ? ` (Context: ${q.description})` : ""}`,
-      });
+      prompt += `--- Question ${i + 1} of ${answers.length} ---\n`;
+      prompt += `"${q?.question_text || "Unknown"}"`;
+      if (q?.description) prompt += ` (Context: ${q.description})`;
+      prompt += "\n";
 
       if (a.video_url) {
-        console.log(`Including video ${i + 1} via URL: ${a.video_url}`);
-        contentParts.push({
-          type: "image_url",
-          image_url: { url: a.video_url },
-        });
-        contentParts.push({
-          type: "text",
-          text: `[Video response above for Question ${i + 1}]`,
-        });
+        prompt += `[Video response submitted]\n`;
       } else {
-        contentParts.push({
-          type: "text",
-          text: `[SKIPPED — No recording submitted for this question]`,
-        });
+        prompt += `[SKIPPED — No recording submitted]\n`;
       }
+      prompt += "\n";
     }
-
-    contentParts.push({
-      type: "text",
-      text: `\nPlease carefully watch each video response and provide a thorough evaluation of this candidate.`,
-    });
 
     const systemPrompt = `You are an expert hiring evaluator for ${template?.title || "a role"}${template?.department ? ` in the ${template.department} department` : ""}. 
 
-You are evaluating a candidate's video interview submission. You will receive the actual video recordings of the candidate answering each question. Watch each video carefully and evaluate based on:
+You are evaluating a candidate's interview submission based on the questions asked and whether they were answered or skipped. Since you cannot watch the video responses directly, evaluate based on:
 
-- **Communication skills**: clarity of speech, articulation, confidence, pace, and fluency
-- **Body language & presentation**: eye contact, posture, professional appearance, energy
-- **Content quality**: relevance, depth, and structure of their answers to each specific question
-- **Enthusiasm & engagement**: genuine interest in the role, passion, and energy
-- **Critical thinking**: ability to think on their feet, provide examples, and reason through questions
-- **Overall suitability**: how well they match the requirements of the role
+- **Completion rate**: How many questions were answered vs skipped
+- **Question relevance**: Whether the questions asked align with assessing the candidate for this role
+- **Red flags**: Skipped questions, especially required or critical ones
+- **Overall engagement**: Did the candidate complete the full interview?
 
 ${template?.description ? `Role description: ${template.description}` : ""}
 
-Be specific in your evaluation — reference what you observed in the videos. Note any skipped questions as a concern.
+Provide a fair preliminary assessment. Note that this is a text-based analysis — video review by a human reviewer is recommended for final decisions.
 
 You MUST call the suggest_evaluation function with your assessment.`;
 
-    console.log(`Sending AI request with ${contentParts.length} content parts (video URLs, not base64)`);
+    console.log(`Sending text-based AI evaluation request for submission ${submission_id}`);
 
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -125,14 +100,14 @@ You MUST call the suggest_evaluation function with your assessment.`;
         model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: contentParts },
+          { role: "user", content: prompt },
         ],
         tools: [
           {
             type: "function",
             function: {
               name: "suggest_evaluation",
-              description: "Submit a structured evaluation of the candidate based on their video responses",
+              description: "Submit a structured evaluation of the candidate based on their interview submission",
               parameters: {
                 type: "object",
                 properties: {
@@ -142,17 +117,17 @@ You MUST call the suggest_evaluation function with your assessment.`;
                   },
                   summary: {
                     type: "string",
-                    description: "2-3 sentence overview of the candidate's performance based on what you observed in the videos",
+                    description: "2-3 sentence overview of the candidate's submission",
                   },
                   strengths: {
                     type: "array",
                     items: { type: "string" },
-                    description: "2-4 key strengths observed in the video responses",
+                    description: "2-4 key strengths observed",
                   },
                   concerns: {
                     type: "array",
                     items: { type: "string" },
-                    description: "1-3 concerns or areas to probe further based on the video responses",
+                    description: "1-3 concerns or areas to probe further",
                   },
                   recommendation: {
                     type: "string",
@@ -189,7 +164,7 @@ You MUST call the suggest_evaluation function with your assessment.`;
     }
 
     const aiData = await aiResponse.json();
-    console.log("AI response choices:", JSON.stringify(aiData.choices?.[0]?.message, null, 2));
+    console.log("AI response received successfully");
 
     let evaluation: any = null;
 
@@ -205,7 +180,6 @@ You MUST call the suggest_evaluation function with your assessment.`;
     if (!evaluation) {
       const content = aiData.choices?.[0]?.message?.content;
       if (content) {
-        console.log("No tool call found, trying to parse content as JSON");
         try {
           const jsonMatch = content.match(/\{[\s\S]*\}/);
           if (jsonMatch) evaluation = JSON.parse(jsonMatch[0]);
