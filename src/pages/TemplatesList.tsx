@@ -227,7 +227,9 @@ export default function TemplatesList() {
                   className="glass-card-hover gradient-border p-6"
                 >
                   <div className="flex items-start justify-between mb-2">
-                    <h3 className="font-display font-semibold text-lg leading-tight">{template.title}</h3>
+                    <Link to={`/admin/submissions?template=${template.id}`} className="font-display font-semibold text-lg leading-tight hover:text-primary transition-colors cursor-pointer">
+                      {template.title}
+                    </Link>
                     <div className="flex items-center gap-1.5 shrink-0">
                       {isExpired && (
                         <span className="rounded-full bg-destructive/20 text-destructive px-2 py-0.5 text-xs font-medium">Expired</span>
