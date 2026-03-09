@@ -48,6 +48,8 @@ export default function TemplateBuilder() {
   const [loading, setLoading] = useState(!isNew);
   const [dbQuestionIds, setDbQuestionIds] = useState<Set<string>>(new Set());
   const [recordingQuestionId, setRecordingQuestionId] = useState<string | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [bulkInviteOpen, setBulkInviteOpen] = useState(false);
 
   useEffect(() => {
     if (!isNew && id) loadTemplate();
