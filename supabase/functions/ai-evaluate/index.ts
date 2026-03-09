@@ -21,17 +21,11 @@ serve(async (req) => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // Check if already evaluated
-    const { data: existing } = await supabase
+    // Delete any existing evaluation (for re-runs)
+    await supabase
       .from("ai_evaluations")
-      .select("id")
-      .eq("submission_id", submission_id)
-      .maybeSingle();
-    if (existing) {
-      return new Response(JSON.stringify({ success: true, already_evaluated: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+      .delete()
+      .eq("submission_id", submission_id);
 
     // Load submission
     const { data: submission, error: subErr } = await supabase
