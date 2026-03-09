@@ -138,7 +138,7 @@ export default function TemplatesList() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="font-display text-3xl font-bold">Templates</h1>
+            <h1 className="font-display text-3xl font-bold">Interviews</h1>
             <p className="mt-1 text-muted-foreground">Manage your interview templates</p>
           </div>
           <Link to="/admin/templates/new" className="glow-button flex items-center gap-2 text-sm">
