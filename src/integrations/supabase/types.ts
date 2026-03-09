@@ -14,6 +14,50 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_evaluations: {
+        Row: {
+          concerns: string[]
+          created_at: string
+          id: string
+          overall_score: number
+          raw_response: Json | null
+          recommendation: string
+          strengths: string[]
+          submission_id: string
+          summary: string
+        }
+        Insert: {
+          concerns?: string[]
+          created_at?: string
+          id?: string
+          overall_score: number
+          raw_response?: Json | null
+          recommendation: string
+          strengths?: string[]
+          submission_id: string
+          summary: string
+        }
+        Update: {
+          concerns?: string[]
+          created_at?: string
+          id?: string
+          overall_score?: number
+          raw_response?: Json | null
+          recommendation?: string
+          strengths?: string[]
+          submission_id?: string
+          summary?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_evaluations_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: true
+            referencedRelation: "submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       interview_templates: {
         Row: {
           admin_id: string

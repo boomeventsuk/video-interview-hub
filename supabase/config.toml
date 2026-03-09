@@ -2,3 +2,6 @@ project_id = "imqqdrkrxvmuovqjjscl"
 
 [functions.cleanup-videos]
 verify_jwt = false
+
+[functions.ai-evaluate]
+verify_jwt = false

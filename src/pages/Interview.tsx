@@ -403,12 +403,17 @@ export default function Interview() {
     } else {
       stopStream();
       setStage("complete");
-      // Mark submission as completed
+      // Mark submission as completed and trigger AI evaluation
       if (submissionId && submissionId !== "preview") {
         supabase.from("submissions").update({
           status: "new",
           completed_at: new Date().toISOString(),
-        } as any).eq("id", submissionId);
+        } as any).eq("id", submissionId).then(() => {
+          // Fire-and-forget AI evaluation
+          supabase.functions.invoke("ai-evaluate", {
+            body: { submission_id: submissionId },
+          }).catch((err) => console.error("AI evaluation trigger failed:", err));
+        });
       }
     }
   };
