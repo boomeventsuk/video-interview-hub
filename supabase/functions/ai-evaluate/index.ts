@@ -52,52 +52,41 @@ serve(async (req) => {
     const template = (submission as any).interview_templates;
     const candidateName = (submission as any).applicant_name;
 
-    // Build the user message with video content parts for multimodal analysis
+    // Build content parts for multimodal analysis
     const contentParts: any[] = [];
 
-    // Add text context first
-    const systemPrompt = `You are an expert hiring evaluator for ${template?.title || "a role"}${template?.department ? ` in the ${template.department} department` : ""}. 
-
-You are evaluating a candidate's video interview submission. You will be shown the actual video recordings of their responses. Evaluate based on:
-- Communication skills (clarity, confidence, articulation)
-- Relevance and quality of their answers to each question
-- Enthusiasm and engagement
-- Professional presentation
-- How well they understand and address the specific requirements mentioned in each question
-- Overall suitability for the role
-
-${template?.description ? `Role description: ${template.description}` : ""}
-
-Provide your evaluation using the suggest_evaluation function.`;
-
-    let textContext = `Candidate: ${candidateName}\nInterview: ${template?.title || "Unknown"}\n${template?.department ? `Department: ${template.department}\n` : ""}\n`;
+    let textContext = `Candidate: ${candidateName}\nInterview: ${template?.title || "Unknown"}\n${template?.department ? `Department: ${template.department}\n` : ""}`;
+    if (template?.description) {
+      textContext += `Role description: ${template.description}\n`;
+    }
+    textContext += `\nTotal questions: ${answers.length}\nQuestions answered: ${answers.filter((a: any) => !!a.video_url).length}\nQuestions skipped: ${answers.filter((a: any) => !a.video_url).length}\n`;
 
     // Add each question and its video
     for (let i = 0; i < answers.length; i++) {
       const a = answers[i] as any;
       const q = a.questions;
-      const hasVideo = !!a.video_url;
 
       textContext += `\n--- Question ${i + 1} of ${answers.length} ---\n"${q?.question_text || "Unknown"}"${q?.description ? ` (Context: ${q.description})` : ""}\n`;
 
-      if (hasVideo) {
-        textContext += `[Video response provided below]\n`;
+      if (a.video_url) {
+        textContext += `Video response provided - URL: ${a.video_url}\n`;
       } else {
         textContext += `[SKIPPED - No recording submitted]\n`;
       }
     }
 
-    // Add the text context
+    textContext += `\nPlease provide a thorough evaluation of this candidate based on the interview questions they were asked and their responses.`;
+
     contentParts.push({ type: "text", text: textContext });
 
-    // Add video URLs as content parts for Gemini multimodal processing
+    // Add video files as media content parts for Gemini multimodal
     for (let i = 0; i < answers.length; i++) {
       const a = answers[i] as any;
       const q = a.questions;
       if (a.video_url) {
         contentParts.push({
           type: "text",
-          text: `\nVideo response for Question ${i + 1} ("${q?.question_text || "Unknown"}"):`
+          text: `\nVideo for Q${i + 1} ("${q?.question_text || "Unknown"}") follows:`
         });
         contentParts.push({
           type: "image_url",
@@ -106,12 +95,23 @@ Provide your evaluation using the suggest_evaluation function.`;
       }
     }
 
-    contentParts.push({
-      type: "text",
-      text: `\nTotal questions: ${answers.length}\nQuestions answered: ${answers.filter((a: any) => !!a.video_url).length}\nQuestions skipped: ${answers.filter((a: any) => !a.video_url).length}\n\nPlease watch all videos carefully and provide a thorough evaluation of this candidate.`
-    });
+    const systemPrompt = `You are an expert hiring evaluator for ${template?.title || "a role"}${template?.department ? ` in the ${template.department} department` : ""}. 
 
-    // Call Gemini Pro via Lovable AI gateway - using Pro for better video understanding
+You are evaluating a candidate's video interview submission. Evaluate based on:
+- Communication skills (clarity, confidence, articulation)
+- Relevance and quality of their answers to each question
+- Enthusiasm and engagement
+- Professional presentation
+- How well they address the specific requirements mentioned in each question
+- Overall suitability for the role
+
+${template?.description ? `Role description: ${template.description}` : ""}
+
+You MUST call the suggest_evaluation function with your assessment.`;
+
+    console.log("Sending AI request with", contentParts.length, "content parts");
+
+    // Call Gemini via Lovable AI gateway
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -119,7 +119,7 @@ Provide your evaluation using the suggest_evaluation function.`;
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-pro",
+        model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: contentParts },
@@ -129,32 +129,32 @@ Provide your evaluation using the suggest_evaluation function.`;
             type: "function",
             function: {
               name: "suggest_evaluation",
-              description: "Submit a structured evaluation of the candidate based on their video responses",
+              description: "Submit a structured evaluation of the candidate",
               parameters: {
                 type: "object",
                 properties: {
                   overall_score: {
                     type: "integer",
-                    description: "Score from 1-10 (1=poor, 10=exceptional) based on video performance",
+                    description: "Score from 1-10 (1=poor, 10=exceptional)",
                   },
                   summary: {
                     type: "string",
-                    description: "2-3 sentence overview of the candidate's performance based on watching their videos",
+                    description: "2-3 sentence overview of the candidate's performance",
                   },
                   strengths: {
                     type: "array",
                     items: { type: "string" },
-                    description: "2-4 key strengths observed from the video responses",
+                    description: "2-4 key strengths observed",
                   },
                   concerns: {
                     type: "array",
                     items: { type: "string" },
-                    description: "1-3 concerns or areas to probe further based on the video responses",
+                    description: "1-3 concerns or areas to probe further",
                   },
                   recommendation: {
                     type: "string",
                     enum: ["strongly_recommend", "recommend", "consider", "do_not_recommend"],
-                    description: "Hiring recommendation based on video interview performance",
+                    description: "Hiring recommendation",
                   },
                 },
                 required: ["overall_score", "summary", "strengths", "concerns", "recommendation"],
@@ -176,23 +176,71 @@ Provide your evaluation using the suggest_evaluation function.`;
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      throw new Error(`AI gateway error: ${aiResponse.status}`);
+      if (aiResponse.status === 402) {
+        return new Response(JSON.stringify({ success: false, error: "AI credits exhausted, please top up" }), {
+          status: 402,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      throw new Error(`AI gateway error: ${aiResponse.status} - ${errText}`);
     }
 
     const aiData = await aiResponse.json();
-    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-    if (!toolCall) throw new Error("No evaluation returned from AI");
+    console.log("AI response choices:", JSON.stringify(aiData.choices?.[0]?.message, null, 2));
 
-    const evaluation = JSON.parse(toolCall.function.arguments);
+    // Try to get evaluation from tool calls first, then fall back to parsing content
+    let evaluation: any = null;
+
+    const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
+    if (toolCall?.function?.arguments) {
+      try {
+        evaluation = JSON.parse(toolCall.function.arguments);
+      } catch (e) {
+        console.error("Failed to parse tool call arguments:", e);
+      }
+    }
+
+    // Fallback: try to parse from message content if tool call didn't work
+    if (!evaluation) {
+      const content = aiData.choices?.[0]?.message?.content;
+      if (content) {
+        console.log("No tool call found, trying to parse content as JSON");
+        try {
+          // Try to find JSON in the content
+          const jsonMatch = content.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            evaluation = JSON.parse(jsonMatch[0]);
+          }
+        } catch (e) {
+          console.error("Failed to parse content as JSON:", e);
+        }
+      }
+    }
+
+    if (!evaluation) {
+      console.error("Full AI response:", JSON.stringify(aiData, null, 2));
+      throw new Error("No evaluation returned from AI");
+    }
+
+    // Validate and normalize
+    const normalizedEval = {
+      overall_score: Math.min(10, Math.max(1, evaluation.overall_score || 5)),
+      summary: evaluation.summary || "Evaluation completed.",
+      strengths: Array.isArray(evaluation.strengths) ? evaluation.strengths : [],
+      concerns: Array.isArray(evaluation.concerns) ? evaluation.concerns : [],
+      recommendation: ["strongly_recommend", "recommend", "consider", "do_not_recommend"].includes(evaluation.recommendation)
+        ? evaluation.recommendation
+        : "consider",
+    };
 
     // Store evaluation
     const { error: insertErr } = await supabase.from("ai_evaluations").insert({
       submission_id,
-      overall_score: Math.min(10, Math.max(1, evaluation.overall_score)),
-      summary: evaluation.summary,
-      strengths: evaluation.strengths || [],
-      concerns: evaluation.concerns || [],
-      recommendation: evaluation.recommendation,
+      overall_score: normalizedEval.overall_score,
+      summary: normalizedEval.summary,
+      strengths: normalizedEval.strengths,
+      concerns: normalizedEval.concerns,
+      recommendation: normalizedEval.recommendation,
       raw_response: aiData,
     });
 
@@ -201,7 +249,7 @@ Provide your evaluation using the suggest_evaluation function.`;
       throw new Error("Failed to save evaluation");
     }
 
-    return new Response(JSON.stringify({ success: true, evaluation }), {
+    return new Response(JSON.stringify({ success: true, evaluation: normalizedEval }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
