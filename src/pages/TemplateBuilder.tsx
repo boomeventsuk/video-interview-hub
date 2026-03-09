@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion, Reorder } from "framer-motion";
-import { Plus, Trash2, GripVertical, Save, ArrowLeft, Clock, Video, CalendarIcon, Eye, X, RotateCcw } from "lucide-react";
+import { Plus, Trash2, GripVertical, Save, ArrowLeft, Clock, Video, CalendarIcon, Eye, X, RotateCcw, UserPlus, Users } from "lucide-react";
 import { format } from "date-fns";
 import AdminLayout from "@/components/AdminLayout";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,8 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import VideoRecorderDialog from "@/components/VideoRecorderDialog";
+import InviteCandidateDialog from "@/components/InviteCandidateDialog";
+import BulkInviteDialog from "@/components/BulkInviteDialog";
 
 interface Question {
   id: string;
