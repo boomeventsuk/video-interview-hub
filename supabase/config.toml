@@ -1,5 +1,8 @@
 project_id = "txixkwaojyqvklnulpux"
 
+[functions.send-email]
+verify_jwt = false
+
 [functions.cleanup-videos]
 verify_jwt = false
 
