@@ -26,6 +26,7 @@ interface Question {
 }
 
 type Stage = "welcome" | "info" | "setup" | "prep" | "recording" | "review" | "complete";
+const NOTIFY_EMAIL = "hello@boomevents.co.uk";
 
 // IndexedDB helpers
 const IDB_NAME = "interview-blobs";
@@ -60,6 +61,65 @@ async function uploadWithRetry(bucket: string, path: string, blob: Blob, retries
     if (i < retries - 1) await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, i)));
   }
   return false;
+}
+
+function escapeHtml(value: string | null | undefined) {
+  return (value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+function buildCompletionNotificationHtml({
+  name,
+  email,
+  templateTitle,
+  answers,
+}: {
+  name: string;
+  email: string;
+  templateTitle: string;
+  answers: Array<{
+    video_url: string | null;
+    questions?: {
+      question_text?: string | null;
+      order_index?: number | null;
+    } | null;
+  }>;
+}) {
+  const rows = answers
+    .sort((a, b) => (a.questions?.order_index ?? 0) - (b.questions?.order_index ?? 0))
+    .map((answer, index) => `
+      <tr>
+        <td style="padding:12px;border-bottom:1px solid #e5e7eb;vertical-align:top;">
+          <strong>Question ${index + 1}</strong><br/>
+          <span style="color:#4b5563;">${escapeHtml(answer.questions?.question_text || "")}</span>
+        </td>
+        <td style="padding:12px;border-bottom:1px solid #e5e7eb;vertical-align:top;">
+          ${answer.video_url ? `<a href="${answer.video_url}" style="color:#2563eb;">Watch video</a>` : `<span style="color:#b91c1c;">No video URL saved</span>`}
+        </td>
+      </tr>`)
+    .join("");
+
+  return `
+<!DOCTYPE html>
+<html>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;margin:0;padding:24px;">
+  <div style="max-width:720px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:24px;">
+    <h1 style="margin:0 0 12px;font-size:22px;color:#111827;">New Boombastic video interview submitted</h1>
+    <p style="margin:0 0 20px;color:#4b5563;">A candidate has completed the ${escapeHtml(templateTitle)} interview.</p>
+    <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+      <tr><td style="padding:6px 0;color:#6b7280;">Name</td><td style="padding:6px 0;color:#111827;">${escapeHtml(name)}</td></tr>
+      <tr><td style="padding:6px 0;color:#6b7280;">Email</td><td style="padding:6px 0;color:#111827;">${escapeHtml(email)}</td></tr>
+    </table>
+    <table style="width:100%;border-collapse:collapse;border-top:1px solid #e5e7eb;">
+      ${rows}
+    </table>
+  </div>
+</body>
+</html>`;
 }
 
 export default function Interview() {
@@ -415,6 +475,32 @@ export default function Interview() {
     return success;
   };
 
+  const sendCompletionNotification = async (id: string) => {
+    const { data: savedAnswers, error } = await supabase
+      .from("submission_answers")
+      .select("video_url, questions(question_text, order_index)")
+      .eq("submission_id", id);
+
+    if (error) throw error;
+
+    await supabase.functions.invoke("send-email", {
+      body: {
+        to: NOTIFY_EMAIL,
+        toName: "Boombastic Events",
+        subject: `New Event Assistant video interview: ${name}`,
+        html: buildCompletionNotificationHtml({
+          name,
+          email,
+          templateTitle,
+          answers: (savedAnswers || []) as any,
+        }),
+        submissionId: id,
+        templateId,
+        templateType: "share",
+      },
+    });
+  };
+
   const moveToNext = () => {
     if (currentQ + 1 < questions.length) {
       const next = currentQ + 1;
@@ -427,8 +513,11 @@ export default function Interview() {
       if (submissionId && submissionId !== "preview") {
         supabase.from("submissions").update({
           status: "new",
-          completed_at: new Date().toISOString(),
         } as any).eq("id", submissionId).then(() => {
+          sendCompletionNotification(submissionId).catch((err) => {
+            console.error("Completion notification failed:", err);
+          });
+
           // Fire-and-forget AI evaluation
           supabase.functions.invoke("ai-evaluate", {
             body: { submission_id: submissionId },
