@@ -466,11 +466,22 @@ export default function Interview() {
       return false;
     }
 
-    await supabase.from("submission_answers").insert({
+    const { error: saveError } = await supabase.from("submission_answers").insert({
       submission_id: submissionId,
       question_id: q.id,
       video_url: videoUrl,
     });
+
+    if (saveError) {
+      try {
+        await saveBlobToIDB(idbKey, pending.blob);
+      } catch {
+        // The uploaded file is still in Supabase storage, so admin recovery remains possible.
+      }
+      toast.error("Your video uploaded, but the answer could not be saved. Please press Keep answer again.", { duration: 10000 });
+      setUploading(false);
+      return false;
+    }
 
     pendingBlobRef.current = null;
     setUploading(false);
