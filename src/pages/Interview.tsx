@@ -458,10 +458,12 @@ export default function Interview() {
     } else {
       try {
         await saveBlobToIDB(idbKey, pending.blob);
-        toast.error("Upload failed. Your recording is saved locally.", { duration: 10000 });
+        toast.error("Upload failed. Your recording is saved locally. Please check your connection and press Keep answer again.", { duration: 10000 });
       } catch {
         toast.error("Upload failed and could not save locally.");
       }
+      setUploading(false);
+      return false;
     }
 
     await supabase.from("submission_answers").insert({
@@ -529,7 +531,8 @@ export default function Interview() {
 
   const handleNext = async () => {
     if (pendingBlobRef.current) {
-      await uploadAndSave(currentQ);
+      const saved = await uploadAndSave(currentQ);
+      if (saved === false) return;
     }
     moveToNext();
   };
