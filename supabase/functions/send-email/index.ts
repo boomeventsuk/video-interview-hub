@@ -30,15 +30,25 @@ function escapeHtml(value: string | null | undefined) {
     .replace(/'/g, "&#039;");
 }
 
+function getResultEmailBrand(department?: string | null, title?: string | null) {
+  const label = `${department || ""} ${title || ""}`.toLowerCase();
+  if (label.includes("silent disco project") || label.includes("tsdp")) {
+    return "The Silent Disco Project CIC";
+  }
+  return "Boombastic Events";
+}
+
 function buildCompletionNotificationHtml({
   name,
   email,
   templateTitle,
+  brandName,
   answers,
 }: {
   name: string;
   email: string;
   templateTitle: string;
+  brandName: string;
   answers: Array<{
     video_url: string | null;
     questions?: {
@@ -66,7 +76,7 @@ function buildCompletionNotificationHtml({
 <html>
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;margin:0;padding:24px;">
   <div style="max-width:720px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:24px;">
-    <h1 style="margin:0 0 12px;font-size:22px;color:#111827;">New Boombastic video interview submitted</h1>
+    <h1 style="margin:0 0 12px;font-size:22px;color:#111827;">New ${escapeHtml(brandName)} video interview submitted</h1>
     <p style="margin:0 0 20px;color:#4b5563;">A candidate has completed the ${escapeHtml(templateTitle)} interview.</p>
     <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
       <tr><td style="padding:6px 0;color:#6b7280;">Name</td><td style="padding:6px 0;color:#111827;">${escapeHtml(name)}</td></tr>
@@ -93,7 +103,7 @@ serve(async (req) => {
     if (body.templateType === "share" && body.submissionId) {
       const { data: submission } = await supabase
         .from("submissions")
-        .select("applicant_name, applicant_email, interview_templates(title)")
+        .select("applicant_name, applicant_email, interview_templates(title, department)")
         .eq("id", body.submissionId)
         .maybeSingle();
 
@@ -103,10 +113,12 @@ serve(async (req) => {
         .eq("submission_id", body.submissionId);
 
       if (submission && answers && answers.length > 0) {
+        const template = (submission as any).interview_templates;
         html = buildCompletionNotificationHtml({
           name: (submission as any).applicant_name,
           email: (submission as any).applicant_email,
-          templateTitle: (submission as any).interview_templates?.title || "video interview",
+          templateTitle: template?.title || "video interview",
+          brandName: getResultEmailBrand(template?.department, template?.title),
           answers: answers as any,
         });
       }

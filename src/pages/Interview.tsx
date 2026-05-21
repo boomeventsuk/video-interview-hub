@@ -26,7 +26,23 @@ interface Question {
 }
 
 type Stage = "welcome" | "info" | "setup" | "prep" | "recording" | "review" | "complete";
-const NOTIFY_EMAIL = "hello@boomevents.co.uk";
+
+function getResultEmailConfig(department?: string | null, title?: string | null) {
+  const label = `${department || ""} ${title || ""}`.toLowerCase();
+  if (label.includes("silent disco project") || label.includes("tsdp")) {
+    return {
+      to: "hello@thesilentdiscoproject.co.uk",
+      toName: "The Silent Disco Project CIC",
+      brandName: "The Silent Disco Project CIC",
+    };
+  }
+
+  return {
+    to: "hello@boomevents.co.uk",
+    toName: "Boombastic Events",
+    brandName: "Boombastic Events",
+  };
+}
 
 // IndexedDB helpers
 const IDB_NAME = "interview-blobs";
@@ -76,11 +92,13 @@ function buildCompletionNotificationHtml({
   name,
   email,
   templateTitle,
+  brandName,
   answers,
 }: {
   name: string;
   email: string;
   templateTitle: string;
+  brandName: string;
   answers: Array<{
     video_url: string | null;
     questions?: {
@@ -108,7 +126,7 @@ function buildCompletionNotificationHtml({
 <html>
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;margin:0;padding:24px;">
   <div style="max-width:720px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:24px;">
-    <h1 style="margin:0 0 12px;font-size:22px;color:#111827;">New Boombastic video interview submitted</h1>
+    <h1 style="margin:0 0 12px;font-size:22px;color:#111827;">New ${escapeHtml(brandName)} video interview submitted</h1>
     <p style="margin:0 0 20px;color:#4b5563;">A candidate has completed the ${escapeHtml(templateTitle)} interview.</p>
     <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
       <tr><td style="padding:6px 0;color:#6b7280;">Name</td><td style="padding:6px 0;color:#111827;">${escapeHtml(name)}</td></tr>
@@ -130,6 +148,7 @@ export default function Interview() {
   const branding = useBranding(true);
 
   const [templateTitle, setTemplateTitle] = useState("");
+  const [templateDepartment, setTemplateDepartment] = useState<string | null>(null);
   const [templateDesc, setTemplateDesc] = useState("");
   const [introVideoUrl, setIntroVideoUrl] = useState<string | null>(null);
   const [redirectUrl, setRedirectUrl] = useState<string | null>(null);
@@ -256,6 +275,7 @@ export default function Interview() {
     }
 
     setTemplateTitle(template.title);
+    setTemplateDepartment(template.department || null);
     setTemplateDesc(template.description || "");
     setIntroVideoUrl(template.intro_video_url || null);
     setRedirectUrl(template.redirect_url || null);
@@ -496,15 +516,18 @@ export default function Interview() {
 
     if (error) throw error;
 
+    const emailConfig = getResultEmailConfig(templateDepartment, templateTitle);
+
     await supabase.functions.invoke("send-email", {
       body: {
-        to: NOTIFY_EMAIL,
-        toName: "Boombastic Events",
-        subject: `New Event Assistant video interview: ${name}`,
+        to: emailConfig.to,
+        toName: emailConfig.toName,
+        subject: `New ${templateTitle} video interview: ${name}`,
         html: buildCompletionNotificationHtml({
           name,
           email,
           templateTitle,
+          brandName: emailConfig.brandName,
           answers: (savedAnswers || []) as any,
         }),
         submissionId: id,

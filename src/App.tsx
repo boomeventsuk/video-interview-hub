@@ -13,6 +13,7 @@ import Analytics from "./pages/Analytics";
 import Settings from "./pages/Settings";
 import Interview from "./pages/Interview";
 import EventAssistantInterview from "./pages/EventAssistantInterview";
+import TSDPSessionLeaderInterview from "./pages/TSDPSessionLeaderInterview";
 import ShareReview from "./pages/ShareReview";
 import TeamSettings from "./pages/TeamSettings";
 import JoinTeam from "./pages/JoinTeam";
@@ -39,6 +40,7 @@ const App = () => (
           <Route path="/admin/team" element={<ProtectedRoute><TeamSettings /></ProtectedRoute>} />
           <Route path="/interview/:templateId" element={<Interview />} />
           <Route path="/boombastic-event-assistant" element={<EventAssistantInterview />} />
+          <Route path="/tsdp-session-leader" element={<TSDPSessionLeaderInterview />} />
           <Route path="/join/:token" element={<JoinTeam />} />
           <Route path="/review/:token" element={<ShareReview />} />
           <Route path="*" element={<NotFound />} />
