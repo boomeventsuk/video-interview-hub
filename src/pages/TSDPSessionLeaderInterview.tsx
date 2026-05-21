@@ -124,6 +124,7 @@ export default function TSDPSessionLeaderInterview() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [cameraError, setCameraError] = useState("");
+  const [deviceReady, setDeviceReady] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -145,6 +146,7 @@ export default function TSDPSessionLeaderInterview() {
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
+    setDeviceReady(false);
   }, []);
 
   useEffect(() => {
@@ -171,10 +173,13 @@ export default function TSDPSessionLeaderInterview() {
 
     setStage("device");
     setCameraError("");
+    setDeviceReady(false);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
       attachStream(stream);
+      setDeviceReady(true);
     } catch {
+      setDeviceReady(false);
       setCameraError("Camera or microphone access was blocked. Please allow access and try again.");
     }
   };
@@ -435,7 +440,7 @@ export default function TSDPSessionLeaderInterview() {
                       {cameraError}
                     </p>
                   )}
-                  <Button disabled={!!cameraError || !streamRef.current} onClick={() => startPrep(0)} className="mt-6 w-full bg-white text-zinc-950 hover:bg-zinc-200">
+                  <Button disabled={!!cameraError || !deviceReady} onClick={() => startPrep(0)} className="mt-6 w-full bg-white text-zinc-950 hover:bg-zinc-200">
                     Begin questions
                   </Button>
                 </div>
