@@ -20,5 +20,11 @@ Created: 2026-05-21 14:21 BST
 
 ## Deployment
 - Netlify project: `tsdp-video-interview-hub`
-- Production deploy: `6a0f06f3bb95b36465df18d1`
+- Latest production deploy: `6a0f680df316c31cfb8d337b`
 - Production URL: https://tsdp-video-interview-hub.netlify.app
+
+## Debug Alignment Update
+- Updated 2026-05-21 after live device-check debugging.
+- The TSDP and Boombastic direct routes now use the same shared `DirectInterviewPage` engine.
+- Role-specific differences now live only in page config.
+- Regression test added: `src/test/direct-interview-device-check.test.tsx`
