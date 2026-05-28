@@ -42,7 +42,7 @@ export default function CompletionScreen({ name, templateTitle, questionCount, r
         >
           <CheckCircle className="h-10 w-10 text-success" />
         </motion.div>
-        <h2 className="font-display text-3xl font-bold">Interview Complete!</h2>
+        <h2 className="font-display text-3xl font-bold">Video Intro Complete</h2>
         <p className="text-muted-foreground">
           Thank you, {name}. Your responses have been submitted successfully.
         </p>
@@ -50,7 +50,7 @@ export default function CompletionScreen({ name, templateTitle, questionCount, r
         {/* Summary */}
         <div className="rounded-lg border border-border/50 bg-secondary/30 p-4 text-left space-y-2 text-sm">
           <div className="flex justify-between">
-            <span className="text-muted-foreground">Interview</span>
+            <span className="text-muted-foreground">Video intro</span>
             <span className="font-medium">{templateTitle}</span>
           </div>
           <div className="flex justify-between">

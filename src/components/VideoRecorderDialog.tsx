@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getSupportedMimeType } from "@/hooks/useMediaRecorder";
-import { createSquareRecordingStream, SQUARE_MEDIA_CONSTRAINTS } from "@/lib/videoCapture";
+import { createReliableRecordingStream, SQUARE_MEDIA_CONSTRAINTS } from "@/lib/videoCapture";
 
 interface VideoRecorderDialogProps {
   open: boolean;
@@ -79,7 +79,7 @@ export default function VideoRecorderDialog({
   const startRecording = () => {
     if (!streamRef.current || !mimeInfo) return;
     chunksRef.current = [];
-    const recordingStream = createSquareRecordingStream(streamRef.current);
+    const recordingStream = createReliableRecordingStream(streamRef.current);
     let mr: MediaRecorder;
     try {
       mr = new MediaRecorder(recordingStream.stream, {

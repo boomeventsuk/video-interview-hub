@@ -93,7 +93,7 @@ export default function ShareReview() {
         id: (sub as any).id,
         applicant_name: (sub as any).applicant_name,
         created_at: (sub as any).created_at,
-        template_title: (sub as any).interview_templates?.title || "Interview",
+        template_title: (sub as any).interview_templates?.title || "Video Intro",
       },
       answers: (answers || []).map((a: any) => ({
         id: a.id,

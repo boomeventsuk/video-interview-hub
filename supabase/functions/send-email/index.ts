@@ -76,8 +76,8 @@ function buildCompletionNotificationHtml({
 <html>
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;margin:0;padding:24px;">
   <div style="max-width:720px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:24px;">
-    <h1 style="margin:0 0 12px;font-size:22px;color:#111827;">New ${escapeHtml(brandName)} video interview submitted</h1>
-    <p style="margin:0 0 20px;color:#4b5563;">A candidate has completed the ${escapeHtml(templateTitle)} interview.</p>
+    <h1 style="margin:0 0 12px;font-size:22px;color:#111827;">New ${escapeHtml(brandName)} video intro submitted</h1>
+    <p style="margin:0 0 20px;color:#4b5563;">A candidate has completed the ${escapeHtml(templateTitle)} video intro.</p>
     <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
       <tr><td style="padding:6px 0;color:#6b7280;">Name</td><td style="padding:6px 0;color:#111827;">${escapeHtml(name)}</td></tr>
       <tr><td style="padding:6px 0;color:#6b7280;">Email</td><td style="padding:6px 0;color:#111827;">${escapeHtml(email)}</td></tr>
@@ -117,7 +117,7 @@ serve(async (req) => {
         html = buildCompletionNotificationHtml({
           name: (submission as any).applicant_name,
           email: (submission as any).applicant_email,
-          templateTitle: template?.title || "video interview",
+          templateTitle: template?.title || "video intro",
           brandName: getResultEmailBrand(template?.department, template?.title),
           answers: answers as any,
         });

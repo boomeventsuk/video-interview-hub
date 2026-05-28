@@ -66,7 +66,7 @@ export default function TemplatesList() {
 
   const copyLink = (id: string) => {
     navigator.clipboard.writeText(`${window.location.origin}/interview/${id}`);
-    toast.success("Interview link copied!");
+    toast.success("Video intro link copied!");
   };
 
   const duplicateTemplate = async (template: Template) => {
@@ -138,11 +138,11 @@ export default function TemplatesList() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="font-display text-3xl font-bold">Interviews</h1>
-            <p className="mt-1 text-muted-foreground">Manage your interview templates</p>
+            <h1 className="font-display text-3xl font-bold">Video Intros</h1>
+            <p className="mt-1 text-muted-foreground">Manage your video intro templates</p>
           </div>
           <Link to="/admin/templates/new" className="glow-button flex items-center gap-2 text-sm">
-            <Plus className="h-4 w-4" /> New Interview
+            <Plus className="h-4 w-4" /> New Video Intro
           </Link>
         </div>
 
@@ -205,7 +205,7 @@ export default function TemplatesList() {
               <p className="text-muted-foreground text-sm mt-1">
                 {search || deptFilter !== "all"
                   ? "Try adjusting your search or filters."
-                  : "Create your first interview template to get started."}
+                  : "Create your first video intro template to get started."}
               </p>
             </div>
             {!search && deptFilter === "all" && (

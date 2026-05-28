@@ -35,8 +35,8 @@ export default function WelcomeScreen({ title, description, questionCount, intro
         <p className="text-sm text-muted-foreground">
           {questionCount} question{questionCount !== 1 ? "s" : ""} • Timed recording
         </p>
-        <button onClick={onBegin} className="glow-button w-full text-lg py-4" aria-label="Begin interview">
-          Begin Interview
+        <button onClick={onBegin} className="glow-button w-full text-lg py-4" aria-label="Begin video intro">
+          Begin Video Intro
         </button>
       </div>
     </motion.div>

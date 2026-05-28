@@ -133,7 +133,7 @@ export default function BulkInviteDialog({
         await sendEmail({
           to: row.email,
           toName: fullName,
-          subject: `You're invited to interview — ${templateTitle}`,
+          subject: `You're invited to complete a video intro - ${templateTitle}`,
           html: buildInviteEmailHtml({
             candidateName: row.firstName,
             templateTitle,

@@ -245,7 +245,7 @@ export default function TemplateBuilder() {
               <h1 className="font-display text-2xl font-bold">
                 {isNew ? "New Template" : "Edit Template"}
               </h1>
-              <p className="text-sm text-muted-foreground">Configure your interview questions</p>
+              <p className="text-sm text-muted-foreground">Configure your video intro questions</p>
             </div>
           </div>
           {!isNew && id && (
@@ -283,7 +283,7 @@ export default function TemplateBuilder() {
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Frontend Developer Interview"
+              placeholder="e.g. Frontend Developer Video Intro"
               className="bg-secondary/50 border-border/50"
             />
           </div>
@@ -301,7 +301,7 @@ export default function TemplateBuilder() {
             <Textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Brief description of this interview..."
+              placeholder="Brief description of this video intro..."
               className="bg-secondary/50 border-border/50 resize-none"
               rows={3}
             />

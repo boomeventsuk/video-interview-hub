@@ -160,8 +160,8 @@ export default function DeviceCheckScreen({ onReady }: DeviceCheckScreenProps) {
                   <CheckCircle className="h-5 w-5" />
                   <span className="text-sm font-medium">Everything looks good!</span>
                 </div>
-                <button onClick={handleBegin} className="glow-button w-full text-lg py-4" aria-label="Begin interview">
-                  Begin Interview
+                <button onClick={handleBegin} className="glow-button w-full text-lg py-4" aria-label="Begin video intro">
+                  Begin Video Intro
                 </button>
               </motion.div>
             )}

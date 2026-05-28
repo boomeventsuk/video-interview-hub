@@ -5,7 +5,7 @@ import { getSupportedMimeType } from "@/hooks/useMediaRecorder";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createSquareRecordingStream, SQUARE_MEDIA_CONSTRAINTS } from "@/lib/videoCapture";
+import { createReliableRecordingStream, SQUARE_MEDIA_CONSTRAINTS } from "@/lib/videoCapture";
 import { toast } from "sonner";
 
 type Stage = "welcome" | "details" | "device" | "prep" | "recording" | "review" | "complete";
@@ -173,7 +173,7 @@ export default function DirectInterviewPage({ config }: { config: DirectIntervie
 
     const question = config.questions[index];
     let recorder: MediaRecorder;
-    const recordingStream = createSquareRecordingStream(streamRef.current);
+    const recordingStream = createReliableRecordingStream(streamRef.current);
     try {
       recorder = new MediaRecorder(recordingStream.stream, {
         mimeType: mimeInfo.mimeType,
@@ -406,11 +406,11 @@ export default function DirectInterviewPage({ config }: { config: DirectIntervie
         throw new Error(data?.error ? JSON.stringify(data.error) : error?.message || "Email notification failed");
       }
 
-      toast.success("Interview submitted");
+      toast.success("Video intro submitted");
       setSubmitted(true);
       setStage("complete");
     } catch (error: any) {
-      toast.error(error.message || "Failed to submit your interview. Please try again.");
+      toast.error(error.message || "Failed to submit your video intro. Please try again.");
     } finally {
       setSubmitting(false);
     }

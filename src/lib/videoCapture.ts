@@ -12,11 +12,11 @@ export const SQUARE_MEDIA_CONSTRAINTS: MediaStreamConstraints = {
   },
 };
 
-interface SquareRecordingStream {
+interface ReliableRecordingStream {
   stream: MediaStream;
   cleanup: () => void;
 }
 
-export function createSquareRecordingStream(sourceStream: MediaStream): SquareRecordingStream {
+export function createReliableRecordingStream(sourceStream: MediaStream): ReliableRecordingStream {
   return { stream: sourceStream, cleanup: () => {} };
 }

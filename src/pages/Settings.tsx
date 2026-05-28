@@ -175,7 +175,7 @@ export default function Settings() {
                 <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
               </label>
             )}
-            <p className="text-xs text-muted-foreground">Shown on candidate interview pages. Max 5 MB.</p>
+            <p className="text-xs text-muted-foreground">Shown on candidate video intro pages. Max 5 MB.</p>
           </div>
 
           {/* Colours */}

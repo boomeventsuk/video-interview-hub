@@ -46,9 +46,9 @@ export default function ReviewScreen({
             onClick={onNext}
             disabled={uploading}
             className="glow-button w-full flex items-center justify-center gap-2 disabled:opacity-50"
-            aria-label={isLast ? "Submit interview" : "Go to next question"}
+            aria-label={isLast ? "Submit video intro" : "Go to next question"}
           >
-            {isLast ? "Submit Interview" : "Next Question"} <ArrowRight className="h-4 w-4" />
+            {isLast ? "Submit Video Intro" : "Next Question"} <ArrowRight className="h-4 w-4" />
           </button>
 
           {retakesRemaining > 0 && (

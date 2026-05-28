@@ -207,7 +207,7 @@ export default function SubmissionsReview() {
           <div>
             <h1 className="font-display text-3xl font-bold">Submissions</h1>
             <p className="mt-1 text-muted-foreground">
-              Review applicant video interviews
+              Review applicant video intros
               {submissions.length > 0 && (
                 <span className="ml-2 text-xs">({filtered.length} of {submissions.length})</span>
               )}

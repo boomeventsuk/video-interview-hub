@@ -61,7 +61,7 @@ export default function InviteCandidateDialog({
       await sendEmail({
         to: email,
         toName: fullName,
-        subject: `You're invited to interview — ${templateTitle}`,
+        subject: `You're invited to complete a video intro - ${templateTitle}`,
         html: buildInviteEmailHtml({
           candidateName: firstName.trim(),
           templateTitle,
@@ -94,7 +94,7 @@ export default function InviteCandidateDialog({
         </DialogHeader>
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Send an interview invitation for <strong>{templateTitle}</strong>
+            Send a video intro invitation for <strong>{templateTitle}</strong>
           </p>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">

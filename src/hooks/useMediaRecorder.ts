@@ -1,5 +1,5 @@
 import { useRef, useCallback } from "react";
-import { createSquareRecordingStream } from "@/lib/videoCapture";
+import { createReliableRecordingStream } from "@/lib/videoCapture";
 
 const MAX_BLOB_SIZE = 100 * 1024 * 1024; // 100 MB
 
@@ -33,7 +33,7 @@ export function useMediaRecorder({ mimeInfo, stream, onFinished, onSizeError }: 
     if (!stream) return;
     chunksRef.current = [];
     cleanupRecordingStreamRef.current();
-    const recordingStream = createSquareRecordingStream(stream);
+    const recordingStream = createReliableRecordingStream(stream);
     cleanupRecordingStreamRef.current = recordingStream.cleanup;
     let mr: MediaRecorder;
     try {

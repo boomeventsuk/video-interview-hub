@@ -47,7 +47,7 @@ export default function AdminDashboard() {
 
   const copyLink = (id: string) => {
     navigator.clipboard.writeText(`${window.location.origin}/interview/${id}`);
-    toast.success("Interview link copied!");
+    toast.success("Video intro link copied!");
   };
 
   const stats = [
@@ -62,7 +62,7 @@ export default function AdminDashboard() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-display text-3xl font-bold">Dashboard</h1>
-            <p className="mt-1 text-muted-foreground">Manage your video interviews</p>
+            <p className="mt-1 text-muted-foreground">Manage your video intro links</p>
           </div>
           <Link to="/admin/templates/new" className="glow-button flex items-center gap-2 text-sm">
             <Plus className="h-4 w-4" /> New Template
@@ -94,7 +94,7 @@ export default function AdminDashboard() {
 
         {/* Templates */}
         <div>
-          <h2 className="font-display text-xl font-semibold mb-4">Interview Templates</h2>
+          <h2 className="font-display text-xl font-semibold mb-4">Video Intro Templates</h2>
           {loading ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {[1, 2, 3].map((i) => (
@@ -120,7 +120,7 @@ export default function AdminDashboard() {
             <div className="glass-card p-12 text-center space-y-4">
               <FileText className="mx-auto h-16 w-16 text-muted-foreground/30" />
               <div>
-                <h3 className="font-display text-lg font-semibold">Create your first interview</h3>
+                <h3 className="font-display text-lg font-semibold">Create your first video intro</h3>
                 <p className="text-muted-foreground text-sm mt-1">Build a template with questions and share the link with candidates.</p>
               </div>
               <Link to="/admin/templates/new" className="glow-button inline-flex items-center gap-2 text-sm">

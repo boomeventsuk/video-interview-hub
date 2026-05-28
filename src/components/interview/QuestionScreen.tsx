@@ -157,7 +157,7 @@ export default function QuestionScreen({
           <div className="flex flex-col items-center gap-3">
             {stage === "prep" && (
               <button onClick={onSkipPrep} className="glow-button text-sm" aria-label="Skip preparation and start recording">
-                I'm Ready — Start Recording
+                I'm Ready - Start Recording
               </button>
             )}
             {stage === "recording" && (

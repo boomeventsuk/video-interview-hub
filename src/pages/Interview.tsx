@@ -27,6 +27,13 @@ interface Question {
 
 type Stage = "welcome" | "info" | "setup" | "prep" | "recording" | "review" | "complete";
 
+function softenVideoIntroCopy(value: string | null | undefined) {
+  return (value || "")
+    .replace(/one-way video interview/gi, "short video intro")
+    .replace(/video interview/gi, "video intro")
+    .replace(/\binterview\b/gi, "video intro");
+}
+
 function getResultEmailConfig(department?: string | null, title?: string | null) {
   const label = `${department || ""} ${title || ""}`.toLowerCase();
   if (label.includes("silent disco project") || label.includes("tsdp")) {
@@ -129,8 +136,8 @@ function buildCompletionNotificationHtml({
 <html>
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;margin:0;padding:24px;">
   <div style="max-width:720px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:24px;">
-    <h1 style="margin:0 0 12px;font-size:22px;color:#111827;">New ${escapeHtml(brandName)} video interview submitted</h1>
-    <p style="margin:0 0 20px;color:#4b5563;">A candidate has completed the ${escapeHtml(templateTitle)} interview.</p>
+    <h1 style="margin:0 0 12px;font-size:22px;color:#111827;">New ${escapeHtml(brandName)} video intro submitted</h1>
+    <p style="margin:0 0 20px;color:#4b5563;">A candidate has completed the ${escapeHtml(templateTitle)} video intro.</p>
     <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
       <tr><td style="padding:6px 0;color:#6b7280;">Name</td><td style="padding:6px 0;color:#111827;">${escapeHtml(name)}</td></tr>
       <tr><td style="padding:6px 0;color:#6b7280;">Email</td><td style="padding:6px 0;color:#111827;">${escapeHtml(email)}</td></tr>
@@ -277,9 +284,9 @@ export default function Interview() {
       return;
     }
 
-    setTemplateTitle(template.title);
+    setTemplateTitle(softenVideoIntroCopy(template.title));
     setTemplateDepartment(template.department || null);
-    setTemplateDesc(template.description || "");
+    setTemplateDesc(softenVideoIntroCopy(template.description));
     setIntroVideoUrl(template.intro_video_url || null);
     setRedirectUrl(template.redirect_url || null);
     setRetakesAllowed(template.retakes_allowed ?? 1);
@@ -376,7 +383,7 @@ export default function Interview() {
 
     setSubmitting(false);
     if (error || !data) {
-      toast.error("Failed to start interview. Please try again.");
+      toast.error("Failed to start video intro. Please try again.");
       return;
     }
 
@@ -532,7 +539,7 @@ export default function Interview() {
       body: {
         to: emailConfig.to,
         toName: emailConfig.toName,
-        subject: `New ${templateTitle} video interview: ${name}`,
+        subject: `New ${templateTitle} video intro: ${name}`,
         html: buildCompletionNotificationHtml({
           name,
           email,
@@ -598,7 +605,7 @@ export default function Interview() {
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center mesh-gradient">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" aria-label="Loading interview" />
+        <Loader2 className="h-8 w-8 animate-spin text-primary" aria-label="Loading video intro" />
       </div>
     );
   }
@@ -626,8 +633,8 @@ export default function Interview() {
       <div className="flex min-h-screen items-center justify-center mesh-gradient">
         <div className="glass-card p-12 text-center max-w-md space-y-4">
           <AlertTriangle className="mx-auto h-12 w-12 text-destructive" />
-          <h1 className="font-display text-2xl font-bold">Interview Closed</h1>
-          <p className="text-muted-foreground">This interview has passed its deadline and is no longer accepting submissions.</p>
+          <h1 className="font-display text-2xl font-bold">Video Intro Closed</h1>
+          <p className="text-muted-foreground">This video intro has passed its deadline and is no longer accepting submissions.</p>
         </div>
       </div>
     );
@@ -637,8 +644,8 @@ export default function Interview() {
     return (
       <div className="flex min-h-screen items-center justify-center mesh-gradient">
         <div className="glass-card p-12 text-center max-w-md">
-          <h1 className="font-display text-2xl font-bold mb-2">Interview Not Found</h1>
-          <p className="text-muted-foreground">This interview link is invalid or no longer active.</p>
+          <h1 className="font-display text-2xl font-bold mb-2">Video Intro Not Found</h1>
+          <p className="text-muted-foreground">This video intro link is invalid or no longer active.</p>
         </div>
       </div>
     );
@@ -648,7 +655,7 @@ export default function Interview() {
     <div className="flex min-h-screen items-center justify-center mesh-gradient overflow-hidden relative">
       {isPreview && (
         <div className="absolute top-0 left-0 right-0 bg-primary text-primary-foreground text-center py-2 text-sm font-medium z-50">
-          PREVIEW MODE — No data will be saved
+          PREVIEW MODE - No data will be saved
         </div>
       )}
       {branding.logoUrl && (

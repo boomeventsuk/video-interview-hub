@@ -5,12 +5,12 @@ const eventAssistantConfig: DirectInterviewConfig = {
   roleLabel: "Event Assistant",
   heroTitle: "Casual Event Assistant work in Northampton and surrounding areas.",
   heroCopy:
-    "Thanks for applying. This is a quick one-way video step so we can get a feel for your personality, practical experience and availability before booking final video calls.",
+    "Thanks for applying. This short video intro helps us get a feel for your personality, practical experience and availability before booking final video calls.",
   storageFolder: "boombastic-event-assistant",
   notifyEmail: "hello@boomevents.co.uk",
   notifyName: "Boombastic Events",
-  emailHeading: "New Boombastic Event Assistant video interview",
-  emailSubjectPrefix: "Event Assistant video interview",
+  emailHeading: "New Boombastic Event Assistant video intro",
+  emailSubjectPrefix: "Event Assistant video intro",
   emailStorageLabel: "Boombastic Event Assistant",
   completeSentText: (name) => `Thanks, ${name}. Your video answers have been sent to Boombastic Events.`,
   persistence: {

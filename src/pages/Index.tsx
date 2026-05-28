@@ -32,10 +32,10 @@ const Index = () => {
         >
           <h1 className="font-display text-5xl font-bold leading-tight lg:text-6xl">
             The Future of{" "}
-            <span className="gradient-text">Video Interviews</span>
+            <span className="gradient-text">Video Intros</span>
           </h1>
           <p className="mx-auto max-w-xl text-lg text-muted-foreground">
-            Create stunning one-way video interviews, share a link, and review candidates at your own pace. Fast, elegant, effortless.
+            Create short video-intro steps, share a link, and review candidates at your own pace. Fast, elegant, effortless.
           </p>
           <div className="flex items-center justify-center gap-4 pt-4">
             <Link to="/login" className="glow-button flex items-center gap-2 text-lg py-4 px-8">
@@ -52,8 +52,8 @@ const Index = () => {
         >
           {[
             { icon: Video, title: "Record Anywhere", desc: "Candidates record from any device with a camera" },
-            { icon: Shield, title: "Secure & Private", desc: "Enterprise-grade security for all video data" },
-            { icon: Zap, title: "Lightning Fast", desc: "Review interviews 10x faster than live calls" },
+            { icon: Shield, title: "Secure & Private", desc: "Secure handling for candidate video data" },
+            { icon: Zap, title: "Lightning Fast", desc: "Review first-stage candidates faster than live calls" },
           ].map((f, i) => (
             <motion.div
               key={f.title}
