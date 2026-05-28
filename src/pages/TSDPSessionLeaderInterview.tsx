@@ -5,12 +5,12 @@ const tsdpSessionLeaderConfig: DirectInterviewConfig = {
   roleLabel: "School & Community Session Leader",
   heroTitle: "Some jobs look good on paper. This one looks good on people's faces.",
   heroCopy:
-    "The Silent Disco Project CIC brings joy, movement and connection to schools, care homes, SEND groups and community settings across Northamptonshire. This quick one-way video step helps us get a feel for your warmth, confidence, practical judgement and availability.",
+    "The Silent Disco Project CIC brings joy, movement and connection to schools, care homes, SEND groups and community settings across Northamptonshire. This short video intro helps us get a feel for your warmth, confidence, practical judgement and availability.",
   storageFolder: "tsdp-session-leader",
   notifyEmail: "hello@thesilentdiscoproject.co.uk",
   notifyName: "The Silent Disco Project CIC",
-  emailHeading: "New TSDP School & Community Session Leader video interview",
-  emailSubjectPrefix: "School & Community Session Leader video interview",
+  emailHeading: "New TSDP School & Community Session Leader video intro",
+  emailSubjectPrefix: "School & Community Session Leader video intro",
   emailStorageLabel: "TSDP School & Community Session Leader",
   completeSentText: (name) => `Thanks, ${name}. Your video answers have been sent to The Silent Disco Project CIC.`,
   persistence: {

@@ -13,6 +13,17 @@ const eventAssistantConfig: DirectInterviewConfig = {
   emailSubjectPrefix: "Event Assistant video interview",
   emailStorageLabel: "Boombastic Event Assistant",
   completeSentText: (name) => `Thanks, ${name}. Your video answers have been sent to Boombastic Events.`,
+  persistence: {
+    templateId: "47ec094e-58d5-4fd4-a70f-519b76df3a20",
+    warningLabel: "Boombastic Event Assistant template",
+    questionDbIds: {
+      intro: "c07cc8dd-827f-4896-954f-12b569028dde",
+      why: "f735c779-dd3c-48fb-8ac5-83274d7bab44",
+      experience: "bc1ec95b-7f1f-4bb0-a75c-b161a9869b5a",
+      practical: "796113ba-20af-4c25-a1c0-621f0a6f4b8e",
+      availability: "80297174-1692-493b-bcab-421a091d7a3c",
+    },
+  },
   questions: [
     {
       id: "intro",

@@ -5,6 +5,7 @@ import { getSupportedMimeType } from "@/hooks/useMediaRecorder";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { createSquareRecordingStream, SQUARE_MEDIA_CONSTRAINTS } from "@/lib/videoCapture";
 import { toast } from "sonner";
 
 type Stage = "welcome" | "details" | "device" | "prep" | "recording" | "review" | "complete";
@@ -92,7 +93,7 @@ function buildNotificationHtml({
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;margin:0;padding:24px;">
   <div style="max-width:720px;margin:0 auto;background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:24px;">
     <h1 style="margin:0 0 12px;font-size:22px;color:#111827;">${escapeHtml(config.emailHeading)}</h1>
-    <p style="margin:0 0 20px;color:#4b5563;">A candidate has submitted their one-way video interview.</p>
+    <p style="margin:0 0 20px;color:#4b5563;">A candidate has submitted their short video intro.</p>
     <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
       <tr><td style="padding:6px 0;color:#6b7280;">Name</td><td style="padding:6px 0;"><strong>${escapeHtml(name)}</strong></td></tr>
       <tr><td style="padding:6px 0;color:#6b7280;">Email</td><td style="padding:6px 0;"><a href="mailto:${escapeHtml(email)}" style="color:#2563eb;">${escapeHtml(email)}</a></td></tr>
@@ -116,6 +117,9 @@ export default function DirectInterviewPage({ config }: { config: DirectIntervie
   const [timer, setTimer] = useState(PREP_SECONDS);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [pendingAnswer, setPendingAnswer] = useState<Answer | null>(null);
+  const [submissionId, setSubmissionId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [savingAnswer, setSavingAnswer] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [cameraError, setCameraError] = useState("");
@@ -168,11 +172,22 @@ export default function DirectInterviewPage({ config }: { config: DirectIntervie
     setTimer(RECORD_SECONDS);
 
     const question = config.questions[index];
-    const recorder = new MediaRecorder(streamRef.current, { mimeType: mimeInfo.mimeType });
+    let recorder: MediaRecorder;
+    const recordingStream = createSquareRecordingStream(streamRef.current);
+    try {
+      recorder = new MediaRecorder(recordingStream.stream, {
+        mimeType: mimeInfo.mimeType,
+        videoBitsPerSecond: 900_000,
+        audioBitsPerSecond: 64_000,
+      });
+    } catch {
+      recorder = new MediaRecorder(recordingStream.stream, { mimeType: mimeInfo.mimeType });
+    }
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) chunksRef.current.push(event.data);
     };
     recorder.onstop = () => {
+      recordingStream.cleanup();
       const blob = new Blob(chunksRef.current, { type: mimeInfo.mimeType });
       if (blob.size > MAX_BLOB_SIZE) {
         toast.error("That recording is too large. Please record it again.");
@@ -228,7 +243,7 @@ export default function DirectInterviewPage({ config }: { config: DirectIntervie
     setCameraError("");
     setDeviceReady(false);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia(SQUARE_MEDIA_CONSTRAINTS);
       attachStream(stream);
       setDeviceReady(true);
     } catch {
@@ -240,20 +255,6 @@ export default function DirectInterviewPage({ config }: { config: DirectIntervie
   const stopRecording = () => {
     if (recorderRef.current?.state === "recording") {
       recorderRef.current.stop();
-    }
-  };
-
-  const acceptAnswer = () => {
-    if (!pendingAnswer) return;
-    const nextAnswers = [...answers.filter((a) => a.questionId !== pendingAnswer.questionId), pendingAnswer];
-    setAnswers(nextAnswers);
-    setPendingAnswer(null);
-
-    if (questionIndex + 1 < config.questions.length) {
-      startPrep(questionIndex + 1);
-    } else {
-      stopStream();
-      setStage("complete");
     }
   };
 
@@ -269,8 +270,9 @@ export default function DirectInterviewPage({ config }: { config: DirectIntervie
     return { ...answer, url: data.publicUrl };
   };
 
-  const createSubmissionRecord = async () => {
+  const ensureSubmissionRecord = async () => {
     if (!config.persistence) return null;
+    if (submissionId) return submissionId;
 
     const { data, error } = await supabase
       .from("submissions")
@@ -279,6 +281,8 @@ export default function DirectInterviewPage({ config }: { config: DirectIntervie
         applicant_name: name,
         applicant_email: email,
         user_agent: navigator.userAgent,
+        started_at: new Date().toISOString(),
+        status: "started",
       } as any)
       .select("id")
       .single();
@@ -288,7 +292,30 @@ export default function DirectInterviewPage({ config }: { config: DirectIntervie
       return null;
     }
 
+    setSubmissionId(data.id as string);
+    setSessionId(data.id as string);
     return data.id as string;
+  };
+
+  const ensureStorageSessionId = async () => {
+    const persistedSubmissionId = await ensureSubmissionRecord();
+    if (persistedSubmissionId) return persistedSubmissionId;
+    if (sessionId) return sessionId;
+
+    const fallbackSessionId = `${Date.now()}-${crypto.randomUUID()}`;
+    setSessionId(fallbackSessionId);
+    return fallbackSessionId;
+  };
+
+  const handleDetailsContinue = async () => {
+    if (!canContinueDetails) return;
+    setSubmitting(true);
+    try {
+      await ensureStorageSessionId();
+      await startDeviceCheck();
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const saveAnswerRecords = async (submissionId: string, uploadedAnswers: Answer[]) => {
@@ -310,26 +337,61 @@ export default function DirectInterviewPage({ config }: { config: DirectIntervie
     }
   };
 
+  const acceptAnswer = async () => {
+    if (!pendingAnswer || savingAnswer) return;
+
+    setSavingAnswer(true);
+    try {
+      const activeSubmissionId = await ensureSubmissionRecord();
+      const activeSessionId = activeSubmissionId || sessionId || `${Date.now()}-${crypto.randomUUID()}`;
+      if (!sessionId) setSessionId(activeSessionId);
+
+      const uploadedAnswer = await uploadAnswer(pendingAnswer, activeSessionId);
+      if (activeSubmissionId) {
+        await saveAnswerRecords(activeSubmissionId, [uploadedAnswer]);
+      }
+
+      const nextAnswers = [...answers.filter((a) => a.questionId !== uploadedAnswer.questionId), uploadedAnswer];
+      setAnswers(nextAnswers);
+      setPendingAnswer(null);
+
+      if (questionIndex + 1 < config.questions.length) {
+        startPrep(questionIndex + 1);
+      } else {
+        stopStream();
+        setStage("complete");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to save this answer. Please check your connection and try again.");
+    } finally {
+      setSavingAnswer(false);
+    }
+  };
+
   const submitInterview = async () => {
     if (answers.length !== config.questions.length) {
       toast.error(`Please complete all ${config.questions.length} questions before submitting.`);
       return;
     }
 
+    if (answers.some((answer) => !answer.url)) {
+      toast.error("One or more answers have not finished saving yet. Please wait and try again.");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const submissionId = await createSubmissionRecord();
-      const sessionId = submissionId || `${Date.now()}-${crypto.randomUUID()}`;
-      const uploadedAnswers = [];
-      for (const answer of answers) {
-        uploadedAnswers.push(await uploadAnswer(answer, sessionId));
+      if (submissionId && config.persistence) {
+        await supabase
+          .from("submissions")
+          .update({
+            status: "new",
+            completed_at: new Date().toISOString(),
+          } as any)
+          .eq("id", submissionId);
       }
 
-      if (submissionId) {
-        await saveAnswerRecords(submissionId, uploadedAnswers);
-      }
-
-      const html = buildNotificationHtml({ config, name, email, phone, answers: uploadedAnswers });
+      const html = buildNotificationHtml({ config, name, email, phone, answers });
       const { data, error } = await supabase.functions.invoke("send-email", {
         body: {
           to: config.notifyEmail,
@@ -362,7 +424,7 @@ export default function DirectInterviewPage({ config }: { config: DirectIntervie
         <header className="flex items-center justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.28em] text-fuchsia-300">{config.brandName}</p>
-            <p className="mt-1 text-sm text-zinc-400">{config.roleLabel} video interview</p>
+            <p className="mt-1 text-sm text-zinc-400">{config.roleLabel} video intro</p>
           </div>
           <div className="hidden items-center gap-2 text-sm text-zinc-400 sm:flex">
             <Clock className="h-4 w-4" />
@@ -393,7 +455,7 @@ export default function DirectInterviewPage({ config }: { config: DirectIntervie
                 <div className="mt-8 grid gap-3 text-sm text-zinc-300 sm:grid-cols-3">
                   <div className="rounded-lg border border-white/10 bg-white/[0.04] p-4">1 minute to think before each question.</div>
                   <div className="rounded-lg border border-white/10 bg-white/[0.04] p-4">1 minute maximum for each answer.</div>
-                  <div className="rounded-lg border border-white/10 bg-white/[0.04] p-4">Use your phone or laptop camera.</div>
+                  <div className="rounded-lg border border-white/10 bg-white/[0.04] p-4">Use Wi-Fi if possible, especially on a phone.</div>
                 </div>
                 <Button onClick={() => setStage("details")} className="mt-10 h-12 bg-white px-6 text-base font-semibold text-zinc-950 hover:bg-zinc-200">
                   Start <ChevronRight className="ml-2 h-4 w-4" />
@@ -418,8 +480,9 @@ export default function DirectInterviewPage({ config }: { config: DirectIntervie
                     <Label htmlFor="phone">Phone number optional</Label>
                     <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} className="border-white/10 bg-zinc-950" />
                   </div>
-                  <Button disabled={!canContinueDetails} onClick={startDeviceCheck} className="w-full bg-white text-zinc-950 hover:bg-zinc-200">
-                    Check camera and microphone
+                  <Button disabled={!canContinueDetails || submitting} onClick={handleDetailsContinue} className="w-full bg-white text-zinc-950 hover:bg-zinc-200">
+                    {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {submitting ? "Preparing..." : "Check camera and microphone"}
                   </Button>
                 </div>
               </div>
@@ -427,8 +490,8 @@ export default function DirectInterviewPage({ config }: { config: DirectIntervie
 
             {stage === "device" && (
               <div className="mx-auto grid max-w-4xl gap-6 lg:grid-cols-[1.4fr_0.8fr]">
-                <div className="overflow-hidden rounded-xl border border-white/10 bg-black">
-                  <video ref={videoRef} muted playsInline className="aspect-video w-full object-cover" />
+                <div className="mx-auto aspect-square w-full max-w-md overflow-hidden rounded-xl border border-white/10 bg-black">
+                  <video ref={videoRef} muted playsInline className="h-full w-full object-cover" />
                 </div>
                 <div className="rounded-xl border border-white/10 bg-white/[0.04] p-6">
                   <h2 className="text-2xl font-bold">Device check</h2>
@@ -450,8 +513,8 @@ export default function DirectInterviewPage({ config }: { config: DirectIntervie
 
             {(stage === "prep" || stage === "recording") && currentQuestion && (
               <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-                <div className="overflow-hidden rounded-xl border border-white/10 bg-black">
-                  <video ref={videoRef} muted playsInline className="aspect-video w-full object-cover" />
+                <div className="mx-auto aspect-square w-full max-w-md overflow-hidden rounded-xl border border-white/10 bg-black">
+                  <video ref={videoRef} muted playsInline className="h-full w-full object-cover" />
                 </div>
                 <div className="rounded-xl border border-white/10 bg-white/[0.04] p-6">
                   <div className="flex items-center justify-between">
@@ -487,11 +550,12 @@ export default function DirectInterviewPage({ config }: { config: DirectIntervie
                 <h2 className="mt-4 text-2xl font-bold">Answer recorded</h2>
                 <p className="mt-2 text-zinc-400">You can keep this answer or record it again.</p>
                 <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-                  <Button variant="outline" onClick={() => startPrep(questionIndex)} className="border-white/20 bg-transparent text-white hover:bg-white/10">
+                  <Button disabled={savingAnswer} variant="outline" onClick={() => startPrep(questionIndex)} className="border-white/20 bg-transparent text-white hover:bg-white/10">
                     <RotateCcw className="mr-2 h-4 w-4" /> Record again
                   </Button>
-                  <Button onClick={acceptAnswer} className="bg-white text-zinc-950 hover:bg-zinc-200">
-                    Keep answer <ChevronRight className="ml-2 h-4 w-4" />
+                  <Button disabled={savingAnswer} onClick={acceptAnswer} className="bg-white text-zinc-950 hover:bg-zinc-200">
+                    {savingAnswer ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    {savingAnswer ? "Saving..." : "Keep answer"} {!savingAnswer && <ChevronRight className="ml-2 h-4 w-4" />}
                   </Button>
                 </div>
               </div>
@@ -502,17 +566,17 @@ export default function DirectInterviewPage({ config }: { config: DirectIntervie
                 {submitted ? (
                   <>
                     <CheckCircle2 className="mx-auto h-12 w-12 text-cyan-300" />
-                    <h2 className="mt-4 text-2xl font-bold">Interview submitted</h2>
+                    <h2 className="mt-4 text-2xl font-bold">Video intro submitted</h2>
                     <p className="mt-2 text-zinc-400">{config.completeSentText(name)}</p>
                   </>
                 ) : answers.length === config.questions.length ? (
                   <>
                     <CheckCircle2 className="mx-auto h-12 w-12 text-cyan-300" />
                     <h2 className="mt-4 text-2xl font-bold">All questions complete</h2>
-                    <p className="mt-2 text-zinc-400">Submit your interview and we will review it before arranging final video calls.</p>
+                    <p className="mt-2 text-zinc-400">Submit your video intro and we will review it before arranging final video calls.</p>
                     <Button disabled={submitting} onClick={submitInterview} className="mt-6 bg-white text-zinc-950 hover:bg-zinc-200">
                       {submitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                      {submitting ? "Submitting..." : "Submit interview"}
+                      {submitting ? "Submitting..." : "Submit video intro"}
                     </Button>
                   </>
                 ) : (

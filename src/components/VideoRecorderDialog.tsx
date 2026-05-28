@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { getSupportedMimeType } from "@/hooks/useMediaRecorder";
+import { createSquareRecordingStream, SQUARE_MEDIA_CONSTRAINTS } from "@/lib/videoCapture";
 
 interface VideoRecorderDialogProps {
   open: boolean;
@@ -42,10 +43,7 @@ export default function VideoRecorderDialog({
 
   const startCamera = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true,
-      });
+      const stream = await navigator.mediaDevices.getUserMedia(SQUARE_MEDIA_CONSTRAINTS);
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
@@ -81,13 +79,24 @@ export default function VideoRecorderDialog({
   const startRecording = () => {
     if (!streamRef.current || !mimeInfo) return;
     chunksRef.current = [];
-    const mr = new MediaRecorder(streamRef.current, {
-      mimeType: mimeInfo.mimeType,
-    });
+    const recordingStream = createSquareRecordingStream(streamRef.current);
+    let mr: MediaRecorder;
+    try {
+      mr = new MediaRecorder(recordingStream.stream, {
+        mimeType: mimeInfo.mimeType,
+        videoBitsPerSecond: 900_000,
+        audioBitsPerSecond: 64_000,
+      });
+    } catch {
+      mr = new MediaRecorder(recordingStream.stream, {
+        mimeType: mimeInfo.mimeType,
+      });
+    }
     mr.ondataavailable = (e) => {
       if (e.data.size > 0) chunksRef.current.push(e.data);
     };
     mr.onstop = () => {
+      recordingStream.cleanup();
       const blob = new Blob(chunksRef.current, { type: mimeInfo.mimeType });
       if (blob.size > 100 * 1024 * 1024) {
         toast.error("Recording exceeds 100 MB. Please record a shorter video.");
@@ -175,7 +184,7 @@ export default function VideoRecorderDialog({
           <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="relative aspect-video rounded-lg overflow-hidden bg-black">
+          <div className="relative mx-auto aspect-square w-full max-w-sm rounded-lg overflow-hidden bg-black">
             {previewUrl ? (
               <video
                 src={previewUrl}

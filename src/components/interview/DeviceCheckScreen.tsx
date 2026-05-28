@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Camera, Mic, CheckCircle, XCircle, Monitor } from "lucide-react";
+import { SQUARE_MEDIA_CONSTRAINTS } from "@/lib/videoCapture";
 
 interface DeviceCheckScreenProps {
   onReady: (stream: MediaStream) => void;
@@ -27,7 +28,7 @@ export default function DeviceCheckScreen({ onReady }: DeviceCheckScreenProps) {
 
   const requestDevices = useCallback(async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      const stream = await navigator.mediaDevices.getUserMedia(SQUARE_MEDIA_CONSTRAINTS);
       streamRef.current = stream;
 
       if (videoRef.current) {
@@ -105,7 +106,7 @@ export default function DeviceCheckScreen({ onReady }: DeviceCheckScreenProps) {
         ) : (
           <>
             {/* Video preview */}
-            <div className="glass-card overflow-hidden aspect-video max-w-md mx-auto">
+            <div className="glass-card mx-auto aspect-square w-full max-w-sm overflow-hidden">
               <video ref={videoRef} muted playsInline className="w-full h-full object-cover" />
             </div>
 

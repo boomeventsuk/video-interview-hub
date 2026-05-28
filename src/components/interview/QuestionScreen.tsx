@@ -178,7 +178,7 @@ export default function QuestionScreen({
         </div>
 
         <div className="relative">
-          <div className="glass-card overflow-hidden aspect-video">
+          <div className="glass-card mx-auto aspect-square w-full max-w-md overflow-hidden">
             <video ref={videoRef} muted playsInline className="w-full h-full object-cover" />
           </div>
           {stage === "recording" && (

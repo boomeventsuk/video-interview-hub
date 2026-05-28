@@ -72,7 +72,10 @@ async function removeBlobFromIDB(key: string) {
 
 async function uploadWithRetry(bucket: string, path: string, blob: Blob, retries = 3): Promise<boolean> {
   for (let i = 0; i < retries; i++) {
-    const { data } = await supabase.storage.from(bucket).upload(path, blob, { upsert: true });
+    const { data } = await supabase.storage.from(bucket).upload(path, blob, {
+      upsert: true,
+      contentType: blob.type,
+    });
     if (data) return true;
     if (i < retries - 1) await new Promise((r) => setTimeout(r, 1000 * Math.pow(2, i)));
   }
@@ -360,7 +363,14 @@ export default function Interview() {
     setSubmitting(true);
     const { data, error } = await supabase
       .from("submissions")
-      .insert({ template_id: templateId!, applicant_name: name, applicant_email: email, user_agent: navigator.userAgent } as any)
+      .insert({
+        template_id: templateId!,
+        applicant_name: name,
+        applicant_email: email,
+        user_agent: navigator.userAgent,
+        started_at: new Date().toISOString(),
+        status: "started",
+      } as any)
       .select("id")
       .single();
 
@@ -549,6 +559,7 @@ export default function Interview() {
       if (submissionId && submissionId !== "preview") {
         supabase.from("submissions").update({
           status: "new",
+          completed_at: new Date().toISOString(),
         } as any).eq("id", submissionId).then(() => {
           sendCompletionNotification(submissionId).catch((err) => {
             console.error("Completion notification failed:", err);

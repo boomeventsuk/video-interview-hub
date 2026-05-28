@@ -1,4 +1,5 @@
 import { useRef, useCallback } from "react";
+import { createSquareRecordingStream } from "@/lib/videoCapture";
 
 const MAX_BLOB_SIZE = 100 * 1024 * 1024; // 100 MB
 
@@ -26,15 +27,30 @@ interface UseMediaRecorderOptions {
 export function useMediaRecorder({ mimeInfo, stream, onFinished, onSizeError }: UseMediaRecorderOptions) {
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const cleanupRecordingStreamRef = useRef<() => void>(() => {});
 
   const start = useCallback(() => {
     if (!stream) return;
     chunksRef.current = [];
-    const mr = new MediaRecorder(stream, { mimeType: mimeInfo.mimeType });
+    cleanupRecordingStreamRef.current();
+    const recordingStream = createSquareRecordingStream(stream);
+    cleanupRecordingStreamRef.current = recordingStream.cleanup;
+    let mr: MediaRecorder;
+    try {
+      mr = new MediaRecorder(recordingStream.stream, {
+        mimeType: mimeInfo.mimeType,
+        videoBitsPerSecond: 900_000,
+        audioBitsPerSecond: 64_000,
+      });
+    } catch {
+      mr = new MediaRecorder(recordingStream.stream, { mimeType: mimeInfo.mimeType });
+    }
     mr.ondataavailable = (e) => {
       if (e.data.size > 0) chunksRef.current.push(e.data);
     };
     mr.onstop = () => {
+      cleanupRecordingStreamRef.current();
+      cleanupRecordingStreamRef.current = () => {};
       const blob = new Blob(chunksRef.current, { type: mimeInfo.mimeType });
       if (blob.size > MAX_BLOB_SIZE) {
         onSizeError();
