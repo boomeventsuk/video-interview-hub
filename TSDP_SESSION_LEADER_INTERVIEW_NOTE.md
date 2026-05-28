@@ -28,3 +28,10 @@ Created: 2026-05-21 14:21 BST
 - The TSDP and Boombastic direct routes now use the same shared `DirectInterviewPage` engine.
 - Role-specific differences now live only in page config.
 - Regression test added: `src/test/direct-interview-device-check.test.tsx`
+
+## Mobile Reliability Update
+- Updated 2026-05-28 after Laura Isles reported that camera access worked initially but video failed when questions started.
+- Root cause: the direct route was recording via a processed square canvas stream. This can pass initial camera checks but fail or record audio-only on mobile browsers.
+- Fix: direct routes now record the native camera stream directly, with lower camera constraints and bitrate settings for smaller mobile uploads.
+- Candidate-facing TSDP wording changed from "video interview" to "short video intro".
+- Production deploy: `6a185ccb21d6f336068c1868`.
