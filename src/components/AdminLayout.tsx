@@ -25,7 +25,7 @@ import {
 
 const navItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin" },
-  { icon: FileText, label: "Interviews", path: "/admin/templates" },
+  { icon: FileText, label: "Video Intros", path: "/admin/templates" },
   { icon: Users, label: "Submissions", path: "/admin/submissions" },
   { icon: BarChart3, label: "Analytics", path: "/admin/analytics" },
   { icon: UsersRound, label: "Team", path: "/admin/team" },
@@ -58,7 +58,7 @@ function SidebarContent({
         </div>
         {!collapsed && (
           <span className="font-display text-lg font-bold gradient-text">
-            InterviewPro
+            Video Intro Hub
           </span>
         )}
       </div>
@@ -146,7 +146,7 @@ export default function AdminLayout({
               <Zap className="h-4 w-4 text-primary" />
             </div>
             <span className="font-display text-base font-bold gradient-text">
-              InterviewPro
+              Video Intro Hub
             </span>
           </div>
         </header>

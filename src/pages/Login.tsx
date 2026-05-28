@@ -56,7 +56,7 @@ const Login = () => {
               <Zap className="h-7 w-7 text-primary" />
             </motion.div>
             <h1 className="font-display text-2xl font-bold gradient-text">
-              InterviewPro
+              Video Intro Hub
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               {isSignUp ? "Create your admin account" : "Sign in to your dashboard"}

@@ -102,7 +102,7 @@ function buildNotificationHtml({
     <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
       ${answerRows}
     </table>
-    <p style="margin:20px 0 0;color:#6b7280;font-size:13px;">Videos are hosted in the InterviewPro Supabase video bucket under the ${escapeHtml(config.emailStorageLabel)} folder.</p>
+    <p style="margin:20px 0 0;color:#6b7280;font-size:13px;">Videos are hosted securely under the ${escapeHtml(config.emailStorageLabel)} folder.</p>
   </div>
 </body>
 </html>`;

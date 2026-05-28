@@ -119,7 +119,7 @@ export default function TeamSettings() {
       // Send invite email
       await sendEmail({
         to: inviteEmail.trim(),
-        subject: `You've been invited to join ${orgData.name} on InterviewPro`,
+        subject: `You've been invited to join ${orgData.name} on Video Intro Hub`,
         html: buildTeamInviteHtml(orgData.name, roleLabels[inviteRole], joinUrl),
         templateId: orgData.id,
         templateType: "team_invite",
@@ -344,7 +344,7 @@ function buildTeamInviteHtml(orgName: string, role: string, joinUrl: string): st
   return `
   <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background: #0f0f23; color: #e2e8f0;">
     <h1 style="font-size: 22px; font-weight: 700; margin: 0 0 8px; color: #fff;">You're Invited!</h1>
-    <p style="color: #94a3b8; margin: 0 0 24px;">You've been invited to join <strong style="color: #fff;">${orgName}</strong> on InterviewPro as a <strong style="color: #818cf8;">${role}</strong>.</p>
+    <p style="color: #94a3b8; margin: 0 0 24px;">You've been invited to join <strong style="color: #fff;">${orgName}</strong> on Video Intro Hub as a <strong style="color: #818cf8;">${role}</strong>.</p>
     <a href="${joinUrl}" style="display: inline-block; padding: 12px 28px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #fff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 15px;">Accept Invitation</a>
     <p style="margin-top: 24px; font-size: 12px; color: #64748b;">If you didn't expect this invitation, you can safely ignore this email.</p>
   </div>`;

@@ -13,7 +13,7 @@ const Index = () => {
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/20">
             <Zap className="h-5 w-5 text-primary" />
           </div>
-          <span className="font-display text-xl font-bold gradient-text">InterviewPro</span>
+          <span className="font-display text-xl font-bold gradient-text">Video Intro Hub</span>
         </div>
         <Link
           to="/login"
